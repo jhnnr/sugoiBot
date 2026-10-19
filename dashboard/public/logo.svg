@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="kt_bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E1F22"/>
+      <stop offset="100%" stop-color="#141518"/>
+    </linearGradient>
+    <linearGradient id="kt_ear" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF3366"/>
+      <stop offset="100%" stop-color="#E11D48"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base Squircle -->
+  <rect width="128" height="128" rx="30" fill="url(#kt_bg)"/>
+  <rect x="1" y="1" width="126" height="126" rx="29" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="2"/>
+
+  <!-- Geometric Minimalist Kitsune Face -->
+  <!-- Left Ear -->
+  <polygon points="34,22 54,48 24,46" fill="url(#kt_ear)"/>
+  <!-- Right Ear -->
+  <polygon points="94,22 104,46 74,48" fill="url(#kt_ear)"/>
+
+  <!-- White Ceramic Mask Body -->
+  <polygon points="26,46 102,46 92,90 64,106 36,90" fill="#FFFFFF"/>
+
+  <!-- Cyber Angular Eyes -->
+  <polygon points="40,64 54,68 44,72" fill="#1E1F22"/>
+  <polygon points="88,64 74,68 84,72" fill="#1E1F22"/>
+
+  <!-- Third Eye Cyber Sparkle -->
+  <path d="M 64 48 C 64 54 67 58 72 58 C 67 58 64 62 64 68 C 64 62 61 58 56 58 C 61 58 64 54 64 48 Z" 
+        fill="#5865F2"/>
+
+  <!-- Minimal Nose Tip -->
+  <polygon points="62,94 66,94 64,97" fill="#E11D48"/>
+</svg>

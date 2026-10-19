@@ -7,7 +7,10 @@ export default {
     async execute(message) {
         if (message.author.bot || !message.guild) return;
 
-        const enabled = SettingsManager.getJson('xp_enabled', true);
+        const moduleEnabled = SettingsManager.getGuildJson(message.guild.id, 'module_xp_enabled', true);
+        if (!moduleEnabled) return;
+
+        const enabled = SettingsManager.getGuildJson(message.guild.id, 'xp_enabled', true);
         if (!enabled) return;
 
         const min = SettingsManager.getJson('xp_min', 10);

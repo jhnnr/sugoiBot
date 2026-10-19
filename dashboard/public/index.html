@@ -4,37 +4,889 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SugoiBot Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <style>
-        body { font-family: sans-serif; background-color: #2c2f33; color: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .card { background-color: #23272a; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        h1 { color: #7289da; }
-        .stats { display: flex; gap: 2rem; margin-top: 1rem; }
-        .stat-item { flex: 1; }
-        .stat-value { font-size: 2rem; font-weight: bold; color: #99aab5; }
+        :root {
+            --bg-primary: #1e1f22;
+            --bg-secondary: #2b2d31;
+            --bg-tertiary: #313338;
+            --accent: #5865f2;
+            --accent-hover: #4752c4;
+            --text-normal: #dbdee1;
+            --text-muted: #949ba4;
+            --text-heading: #f2f3f5;
+            --success: #23a55a;
+            --danger: #f23f43;
+            --border: #3f4147;
+            --card-hover: #35373c;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-normal);
+            padding: 2rem 1rem;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-secondary);
+            padding: 1.25rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .header h1 {
+            color: var(--text-heading);
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 1rem;
+            overflow: hidden;
+        }
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .user-name {
+            font-weight: 600;
+            color: var(--text-heading);
+            font-size: 0.95rem;
+        }
+        .btn-discord {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.65rem;
+            background-color: var(--accent);
+            color: #ffffff;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: background-color 0.2s, transform 0.1s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-discord:hover {
+            background-color: var(--accent-hover);
+        }
+        .btn-discord:active {
+            transform: scale(0.98);
+        }
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 0.5rem 0.9rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+            color: var(--text-heading);
+            border-color: var(--text-muted);
+        }
+        /* Landing Login Page */
+        .login-hero-card {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 3.5rem 2rem;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .hero-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #5865F2, #854CE6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 4px 16px rgba(88, 101, 242, 0.4);
+        }
+        .hero-title {
+            font-size: 2.2rem;
+            color: var(--text-heading);
+            font-weight: 700;
+        }
+        .hero-subtitle {
+            max-width: 580px;
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            line-height: 1.5;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            width: 100%;
+            margin-top: 1rem;
+            text-align: left;
+        }
+        .feature-box {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+        .feature-box h3 {
+            font-size: 1rem;
+            color: var(--text-heading);
+            margin-bottom: 0.35rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .feature-box p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        /* Logged-in Dashboard View */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .stat-card {
+            background-color: var(--bg-secondary);
+            padding: 1.25rem;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 0.25rem;
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .card {
+            background-color: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .card h2 {
+            color: var(--text-heading);
+            margin-bottom: 1.25rem;
+            font-size: 1.35rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .servers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .server-item {
+            background-color: var(--bg-primary);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .server-item:hover {
+            border-color: var(--accent);
+            background-color: var(--card-hover);
+        }
+        .server-item.selected {
+            border-color: var(--accent);
+            background-color: rgba(88, 101, 242, 0.15);
+        }
+        .server-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--text-heading);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .server-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .server-info {
+            flex: 1;
+            overflow: hidden;
+        }
+        .server-name {
+            font-weight: 600;
+            color: var(--text-heading);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.95rem;
+        }
+        .server-status {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+        .server-status.present {
+            color: var(--success);
+        }
+        .btn-invite {
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            background-color: var(--accent);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 0.3rem;
+        }
+        .section-title {
+            color: var(--text-heading);
+            font-size: 1.05rem;
+            margin: 1.5rem 0 0.75rem 0;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+        .form-group {
+            margin-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .checkboxes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            background-color: var(--bg-primary);
+            padding: 1.25rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+        .checkbox-row input[type="checkbox"] {
+            margin-top: 0.2rem;
+            width: 1.15rem;
+            height: 1.15rem;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .checkbox-label-title {
+            font-weight: 600;
+            color: var(--text-heading);
+            font-size: 0.95rem;
+        }
+        .checkbox-label-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+        label {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-normal);
+        }
+        .help-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        input[type="text"], input[type="number"] {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-heading);
+            padding: 0.65rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus {
+            border-color: var(--accent);
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        .btn-save {
+            background-color: var(--accent);
+            color: #ffffff;
+            border: none;
+            padding: 0.85rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 1rem;
+            width: 100%;
+        }
+        .btn-save:hover {
+            background-color: var(--accent-hover);
+        }
+        .btn-save:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .alert {
+            padding: 0.85rem 1.2rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+            display: none;
+            font-size: 0.95rem;
+        }
+        .alert.success {
+            background-color: rgba(35, 165, 90, 0.2);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+        .alert.error {
+            background-color: rgba(242, 63, 67, 0.2);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+        }
+        .badge {
+            background-color: var(--bg-tertiary);
+            color: var(--text-muted);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>SugoiBot Dashboard</h1>
-        <p>Welcome to the basic SugoiBot status page.</p>
-        <div class="stats">
-            <div class="stat-item">
-                <div class="stat-value" id="guilds">?</div>
-                <div>Guilds</div>
+    <div class="container">
+        <header class="header">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <img src="/logo.svg" alt="SugoiBot" width="34" height="34" style="border-radius: 8px;">
+                <h1 style="margin: 0; font-size: 1.5rem;">SugoiBot</h1>
             </div>
-            <div class="stat-item">
-                <div class="stat-value" id="users">?</div>
-                <div>Tracked Users</div>
+            <div class="user-section" id="authSection">
+                <a href="/auth/discord" class="btn-discord" id="loginHeaderBtn" style="display: none;">
+                    Login with Discord
+                </a>
             </div>
-        </div>
+        </header>
+
+        <!-- Unauthenticated View: Clean Landing Page -->
+        <section class="login-hero-card" id="landingLoginCard">
+            <div class="hero-icon" style="background: none; box-shadow: none;">
+                <img src="/logo.svg" alt="SugoiBot" width="80" height="80" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(88, 101, 242, 0.4);">
+            </div>
+            <h2 class="hero-title">SugoiBot Dashboard</h2>
+            <p class="hero-subtitle">
+                Welcome to your Discord bot control center. Log in with your Discord account to select and manage servers where you hold administrative permissions.
+            </p>
+            <a href="/auth/discord" class="btn-discord" style="font-size: 1.1rem; padding: 0.9rem 2rem;">
+                <svg width="22" height="17" viewBox="0 0 71 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M60.1 4.9C55.5 2.8 50.6 1.2 45.4 0.4C45.3 0.4 45.2 0.5 45.1 0.6C44.4 1.8 43.6 3.4 43.1 4.6C37.5 3.8 31.9 3.8 26.4 4.6C25.9 3.4 25.1 1.8 24.4 0.6C24.3 0.5 24.2 0.4 24.1 0.4C18.9 1.2 14 2.8 9.4 4.9C9.3 4.9 9.2 5 9.2 5.1C-0.1 19 -2.4 32.5 1.2 45.6C1.2 45.7 1.3 45.8 1.4 45.9C7.5 50.4 13.4 53.1 19.2 54.9C19.3 54.9 19.5 54.9 19.6 54.7C20.9 52.9 22.1 50.9 23.2 48.9C23.3 48.7 23.2 48.5 23 48.4C21 47.6 19.1 46.7 17.3 45.6C17.1 45.5 17.1 45.2 17.3 45.1C17.7 44.8 18.1 44.5 18.4 44.2C18.5 44.1 18.7 44.1 18.8 44.2C30.4 49.5 43 49.5 54.4 44.2C54.5 44.1 54.7 44.1 54.8 44.2C55.2 44.5 55.6 44.8 56 45.1C56.2 45.2 56.2 45.5 56 45.6C54.2 46.7 52.3 47.6 50.3 48.4C50.1 48.5 50 48.7 50.1 48.9C51.2 50.9 52.4 52.9 53.7 54.7C53.8 54.9 54 54.9 54.1 54.9C59.9 53.1 65.8 50.4 71.9 45.9C72 45.8 72.1 45.7 72.1 45.6C76.4 31.4 72.7 18.1 60.3 5.1C60.3 5 60.2 4.9 60.1 4.9ZM23.7 37.4C20.2 37.4 17.3 34.2 17.3 30.2C17.3 26.2 20.1 23 23.7 23C27.3 23 30.2 26.2 30.1 30.2C30.1 34.2 27.3 37.4 23.7 37.4ZM49.6 37.4C46.1 37.4 43.2 34.2 43.2 30.2C43.2 26.2 46 23 49.6 23C53.2 23 56.1 26.2 56 30.2C56 34.2 53.2 37.4 49.6 37.4Z" fill="currentColor"/>
+                </svg>
+                Login with Discord
+            </a>
+
+            <div class="features-grid">
+                <div class="feature-box">
+                    <h3>📨 Invite Tracking</h3>
+                    <p>Detect which invite was used by new members, showing inviter and code.</p>
+                </div>
+                <div class="feature-box">
+                    <h3>🖼️ Avatar Auditing</h3>
+                    <p>Track member profile picture updates with side-by-side before & after embeds.</p>
+                </div>
+                <div class="feature-box">
+                    <h3>🔊 Temporary Voice</h3>
+                    <p>Dynamic Join-to-Create private voice rooms with in-chat controls for locking, renaming, and limits.</p>
+                </div>
+                <div class="feature-box">
+                    <h3>🎮 Game Roles</h3>
+                    <p>Automatically create and assign server roles based on what games members are playing.</p>
+                </div>
+                <div class="feature-box">
+                    <h3>⚙️ Granular Logging</h3>
+                    <p>Custom checkboxes to toggle specific logs: joins, leaves, deletions, moderation.</p>
+                </div>
+                <div class="feature-box">
+                    <h3>⭐ XP & Economy</h3>
+                    <p>Configure text and voice XP rewards and server economy settings.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Authenticated View: Active Stats Behind Login -->
+        <section class="stats-grid" id="statsGrid" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-value" id="guilds">-</div>
+                <div class="stat-label">Active Guilds</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="users">-</div>
+                <div class="stat-label">Tracked Users</div>
+            </div>
+        </section>
+
+        <!-- Authenticated View: Server Selector -->
+        <section class="card" id="serversSection" style="display: none;">
+            <h2>
+                <span>Manage Server</span>
+                <span class="badge" id="serverCountBadge">0 Servers</span>
+            </h2>
+            <div class="servers-grid" id="serversGrid">
+                <!-- Dynamically populated -->
+            </div>
+        </section>
+
+        <!-- Authenticated View: Server Settings Card -->
+        <section class="card" id="settingsCard" style="display: none;">
+            <h2>
+                <span id="selectedServerTitle">Server Settings</span>
+                <span class="badge" id="selectedServerBadge">Global</span>
+            </h2>
+            <form id="settingsForm">
+                <h3 class="section-title">Active Modules</h3>
+                <p class="help-text" style="margin-bottom: 0.75rem;">Enable or disable entire modules for this server:</p>
+                <div class="checkboxes-list" style="margin-bottom: 1.5rem;">
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="module_general_enabled" name="module_general_enabled">
+                        <label for="module_general_enabled">
+                            <div class="checkbox-label-title">General Module</div>
+                            <div class="checkbox-label-desc">General bot utilities like /ping.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="module_economy_enabled" name="module_economy_enabled">
+                        <label for="module_economy_enabled">
+                            <div class="checkbox-label-title">Economy Module</div>
+                            <div class="checkbox-label-desc">Currency commands: /balance, /daily, /work, and /coinflip.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="module_moderation_enabled" name="module_moderation_enabled">
+                        <label for="module_moderation_enabled">
+                            <div class="checkbox-label-title">Moderation Module</div>
+                            <div class="checkbox-label-desc">Moderation tools: /ban, /kick, /warn, and /clear.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="module_xp_enabled" name="module_xp_enabled">
+                        <label for="module_xp_enabled">
+                            <div class="checkbox-label-title">XP & Leveling Module</div>
+                            <div class="checkbox-label-desc">Level progression, /rank, /leaderboard, and text & voice XP rewards.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="module_gamerole_enabled" name="module_gamerole_enabled">
+                        <label for="module_gamerole_enabled">
+                            <div class="checkbox-label-title">GameRole Module</div>
+                            <div class="checkbox-label-desc">Automatically gives and removes roles to users based on what game they are playing.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="module_voice_enabled" name="module_voice_enabled">
+                        <label for="module_voice_enabled">
+                            <div class="checkbox-label-title">Temporary Voice Module</div>
+                            <div class="checkbox-label-desc">Dynamic Join-to-Create temporary voice rooms with in-chat control interface.</div>
+                        </label>
+                    </div>
+                </div>
+
+                <h3 class="section-title">Log Destination</h3>
+                <div class="form-group">
+                    <label for="log_channel_id">Log Channel ID</label>
+                    <input type="text" id="log_channel_id" name="log_channel_id" placeholder="Discord Channel ID (e.g. 123456789012345678)">
+                    <span class="help-text">The text channel where SugoiBot posts server audit logs and alerts.</span>
+                </div>
+
+                <h3 class="section-title">Event Logging Options</h3>
+                <p class="help-text" style="margin-bottom: 0.75rem;">Select which bot events you want to be delivered to your log channel:</p>
+                <div class="checkboxes-list">
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_member_join" name="log_events_member_join">
+                        <label for="log_events_member_join">
+                            <div class="checkbox-label-title">Member Joins & Invite Tracking</div>
+                            <div class="checkbox-label-desc">Logs when new users join, revealing who invited them, the invite code used, and account age.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_member_leave" name="log_events_member_leave">
+                        <label for="log_events_member_leave">
+                            <div class="checkbox-label-title">Member Leaves</div>
+                            <div class="checkbox-label-desc">Logs when users leave or are removed from the server.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_member_update" name="log_events_member_update">
+                        <label for="log_events_member_update">
+                            <div class="checkbox-label-title">Avatar & Profile Picture Updates</div>
+                            <div class="checkbox-label-desc">Logs member avatar changes, showing the previous and current profile pictures.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_message_delete" name="log_events_message_delete">
+                        <label for="log_events_message_delete">
+                            <div class="checkbox-label-title">Message Deletions</div>
+                            <div class="checkbox-label-desc">Logs deleted messages along with their author and original content.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_channels" name="log_events_channels">
+                        <label for="log_events_channels">
+                            <div class="checkbox-label-title">Channel Creations & Deletions</div>
+                            <div class="checkbox-label-desc">Logs when channels are created or deleted, identifying who created or deleted them.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_moderation" name="log_events_moderation">
+                        <label for="log_events_moderation">
+                            <div class="checkbox-label-title">Moderation Actions</div>
+                            <div class="checkbox-label-desc">Logs kicks, bans, and warnings executed by server staff.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_voice" name="log_events_voice">
+                        <label for="log_events_voice">
+                            <div class="checkbox-label-title">Voice State Updates</div>
+                            <div class="checkbox-label-desc">Logs when users join, leave, or switch voice channels.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_commands" name="log_events_commands">
+                        <label for="log_events_commands">
+                            <div class="checkbox-label-title">Command Execution</div>
+                            <div class="checkbox-label-desc">Logs whenever a user invokes a slash command in the server.</div>
+                        </label>
+                    </div>
+                </div>
+
+                <h3 class="section-title">XP & Leveling</h3>
+                <div class="checkboxes-list" style="margin-bottom: 1rem;">
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="xp_enabled" name="xp_enabled">
+                        <label for="xp_enabled">
+                            <div class="checkbox-label-title">Enable XP & Leveling in this server</div>
+                            <div class="checkbox-label-desc">Awards XP for chat messages and time spent in voice channels.</div>
+                        </label>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="xp_min">Min XP Per Message</label>
+                        <input type="number" id="xp_min" name="xp_min" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="xp_max">Max XP Per Message</label>
+                        <input type="number" id="xp_max" name="xp_max" min="1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="xp_voice_per_minute">Voice XP (Per Minute)</label>
+                    <input type="number" id="xp_voice_per_minute" name="xp_voice_per_minute" min="0">
+                </div>
+
+                <button type="submit" class="btn-save" id="saveBtn">Save Server Settings</button>
+                <div class="alert" id="alertBox"></div>
+            </form>
+        </section>
     </div>
+
     <script>
-        fetch('/api/stats')
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('guilds').textContent = data.guildCount || 0;
-                document.getElementById('users').textContent = data.userCount || 0;
+        const authSection = document.getElementById('authSection');
+        const loginHeaderBtn = document.getElementById('loginHeaderBtn');
+        const landingLoginCard = document.getElementById('landingLoginCard');
+        const statsGrid = document.getElementById('statsGrid');
+        const serversSection = document.getElementById('serversSection');
+        const serversGrid = document.getElementById('serversGrid');
+        const serverCountBadge = document.getElementById('serverCountBadge');
+        const settingsCard = document.getElementById('settingsCard');
+        const selectedServerTitle = document.getElementById('selectedServerTitle');
+        const selectedServerBadge = document.getElementById('selectedServerBadge');
+        const alertBox = document.getElementById('alertBox');
+        const saveBtn = document.getElementById('saveBtn');
+
+        let currentGuildId = null;
+
+        function showAlert(msg, isSuccess) {
+            alertBox.textContent = msg;
+            alertBox.className = 'alert ' + (isSuccess ? 'success' : 'error');
+            alertBox.style.display = 'block';
+            setTimeout(() => { alertBox.style.display = 'none'; }, 4500);
+        }
+
+        function loadStats() {
+            fetch('/api/stats')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('guilds').textContent = data.guildCount ?? 0;
+                    document.getElementById('users').textContent = data.userCount ?? 0;
+                })
+                .catch(() => {});
+        }
+
+        // Check authentication
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/me');
+                const data = await res.json();
+                if (data.user) {
+                    renderLoggedInUser(data.user);
+                    loadStats();
+                    loadGuilds();
+                } else {
+                    renderLoggedOut();
+                }
+            } catch {
+                renderLoggedOut();
+            }
+        }
+
+        function renderLoggedInUser(user) {
+            const avatarUrl = user.avatar
+                ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`
+                : null;
+
+            authSection.innerHTML = `
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        ${avatarUrl ? `<img src="${avatarUrl}" alt="${user.username}">` : user.username.charAt(0).toUpperCase()}
+                    </div>
+                    <span class="user-name">${user.username}</span>
+                    <button class="btn-secondary" id="logoutBtn">Logout</button>
+                </div>
+            `;
+
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.reload();
             });
+
+            // Show authenticated dashboard content, hide landing login hero
+            landingLoginCard.style.display = 'none';
+            statsGrid.style.display = 'grid';
+            serversSection.style.display = 'block';
+        }
+
+        function renderLoggedOut() {
+            authSection.innerHTML = '';
+            // Hide dashboard sections, show landing login page
+            statsGrid.style.display = 'none';
+            serversSection.style.display = 'none';
+            settingsCard.style.display = 'none';
+            landingLoginCard.style.display = 'flex';
+        }
+
+        async function loadGuilds() {
+            try {
+                const res = await fetch('/api/guilds');
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const guilds = data.guilds || [];
+
+                serverCountBadge.textContent = `${guilds.length} Servers`;
+
+                if (guilds.length === 0) {
+                    serversGrid.innerHTML = `
+                        <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                            No servers found where you have Administrator or Manage Server permissions.
+                        </div>
+                    `;
+                    return;
+                }
+
+                serversGrid.innerHTML = guilds.map(g => {
+                    const iconUrl = g.icon
+                        ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64`
+                        : null;
+                    return `
+                        <div class="server-item ${currentGuildId === g.id ? 'selected' : ''}" data-guild-id="${g.id}" data-guild-name="${g.name}">
+                            <div class="server-icon">
+                                ${iconUrl ? `<img src="${iconUrl}" alt="${g.name}">` : g.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="server-info">
+                                <div class="server-name" title="${g.name}">${g.name}</div>
+                                <div class="server-status ${g.botPresent ? 'present' : ''}">
+                                    ${g.botPresent ? '● Bot Active' : '○ Bot Not In Server'}
+                                </div>
+                                ${!g.botPresent && g.inviteUrl ? `<a href="${g.inviteUrl}" target="_blank" class="btn-invite" onclick="event.stopPropagation()">Invite Bot</a>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                document.querySelectorAll('.server-item').forEach(el => {
+                    el.addEventListener('click', () => {
+                        const gid = el.getAttribute('data-guild-id');
+                        const gname = el.getAttribute('data-guild-name');
+                        selectGuild(gid, gname);
+                    });
+                });
+
+                // Auto-select first manageable guild if available
+                if (guilds.length > 0 && !currentGuildId) {
+                    selectGuild(guilds[0].id, guilds[0].name);
+                }
+            } catch {
+                showAlert('Failed to load server list', false);
+            }
+        }
+
+        async function selectGuild(guildId, guildName) {
+            currentGuildId = guildId;
+
+            document.querySelectorAll('.server-item').forEach(el => {
+                el.classList.toggle('selected', el.getAttribute('data-guild-id') === guildId);
+            });
+
+            selectedServerTitle.textContent = `${guildName} Settings`;
+            selectedServerBadge.textContent = `ID: ${guildId}`;
+            settingsCard.style.display = 'block';
+
+            try {
+                const res = await fetch(`/api/guilds/${guildId}/settings`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const s = data.settings || {};
+
+                document.getElementById('module_general_enabled').checked = s.module_general_enabled ?? true;
+                document.getElementById('module_economy_enabled').checked = s.module_economy_enabled ?? true;
+                document.getElementById('module_moderation_enabled').checked = s.module_moderation_enabled ?? true;
+                document.getElementById('module_xp_enabled').checked = s.module_xp_enabled ?? true;
+                document.getElementById('module_gamerole_enabled').checked = s.module_gamerole_enabled ?? true;
+                const voiceVal = (s.module_voice_enabled !== undefined) ? s.module_voice_enabled : (s.module_voicemaster_enabled ?? true);
+                document.getElementById('module_voice_enabled').checked = Boolean(voiceVal);
+
+                document.getElementById('log_channel_id').value = s.log_channel_id || '';
+                document.getElementById('log_events_member_join').checked = s.log_events_member_join ?? true;
+                document.getElementById('log_events_member_leave').checked = s.log_events_member_leave ?? true;
+                document.getElementById('log_events_member_update').checked = s.log_events_member_update ?? true;
+                document.getElementById('log_events_message_delete').checked = s.log_events_message_delete ?? true;
+                document.getElementById('log_events_moderation').checked = s.log_events_moderation ?? true;
+                document.getElementById('log_events_voice').checked = s.log_events_voice ?? false;
+                document.getElementById('log_events_commands').checked = s.log_events_commands ?? false;
+
+                document.getElementById('xp_enabled').checked = s.xp_enabled ?? true;
+                document.getElementById('xp_min').value = s.xp_min ?? 10;
+                document.getElementById('xp_max').value = s.xp_max ?? 20;
+                document.getElementById('xp_voice_per_minute').value = s.xp_voice_per_minute ?? 5;
+            } catch {
+                showAlert('Failed to load settings for this server', false);
+            }
+        }
+
+        // Handle Save
+        document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentGuildId) return;
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            const payload = {
+                module_general_enabled: document.getElementById('module_general_enabled').checked,
+                module_economy_enabled: document.getElementById('module_economy_enabled').checked,
+                module_moderation_enabled: document.getElementById('module_moderation_enabled').checked,
+                module_xp_enabled: document.getElementById('module_xp_enabled').checked,
+                module_gamerole_enabled: document.getElementById('module_gamerole_enabled').checked,
+                module_voice_enabled: document.getElementById('module_voice_enabled').checked,
+                module_voicemaster_enabled: document.getElementById('module_voice_enabled').checked,
+                voice_enabled: document.getElementById('module_voice_enabled').checked,
+                voicemaster_enabled: document.getElementById('module_voice_enabled').checked,
+                log_channel_id: document.getElementById('log_channel_id').value.trim(),
+                log_events_member_join: document.getElementById('log_events_member_join').checked,
+                log_events_member_leave: document.getElementById('log_events_member_leave').checked,
+                log_events_member_update: document.getElementById('log_events_member_update').checked,
+                log_events_message_delete: document.getElementById('log_events_message_delete').checked,
+                log_events_moderation: document.getElementById('log_events_moderation').checked,
+                log_events_voice: document.getElementById('log_events_voice').checked,
+                log_events_commands: document.getElementById('log_events_commands').checked,
+                xp_enabled: document.getElementById('xp_enabled').checked,
+                xp_min: Number(document.getElementById('xp_min').value),
+                xp_max: Number(document.getElementById('xp_max').value),
+                xp_voice_per_minute: Number(document.getElementById('xp_voice_per_minute').value)
+            };
+
+            try {
+                const res = await fetch(`/api/guilds/${currentGuildId}/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    showAlert('Server settings updated successfully!', true);
+                } else {
+                    showAlert(result.error || 'Failed to save server settings', false);
+                }
+            } catch (err) {
+                showAlert('Network error while saving settings', false);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Server Settings';
+            }
+        });
+
+        checkAuth();
     </script>
 </body>
 </html>

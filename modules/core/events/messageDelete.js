@@ -4,15 +4,16 @@ import { loggingService } from '../../../lib/bot/loggingService.js';
 export default {
     name: Events.MessageDelete,
     async execute(message) {
-        if (message.author?.bot || !message.guild) return;
+        if (!message.guild) return;
+        if (message.author?.bot) return;
+
+        const contentText = message.content?.substring(0, 1024) || '*No text content (embed or attachment)*';
 
         await loggingService.log(message.guild, {
-            title: 'Message Deleted',
-            description: `A message by ${message.author} was deleted in ${message.channel}.`,
-            color: 0xFF0000,
-            fields: [
-                { name: 'Content', value: message.content?.substring(0, 1024) || '*No content (possibly an embed or attachment)*' }
-            ]
+            description: `🗑️ Message deleted in ${message.channel}\n${contentText}`,
+            color: 0xED4245,
+            eventType: 'log_events_message_delete',
+            user: message.author
         });
     },
 };

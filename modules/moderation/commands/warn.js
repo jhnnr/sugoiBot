@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import db from '../../../lib/database.js';
+import { Member } from '../../../lib/classes/Member.js';
+import { loggingService } from '../../../lib/bot/loggingService.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -15,19 +16,32 @@ export default {
                 .setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
     async execute(interaction) {
-        const target = interaction.options.getUser('target');
+        const targetMember = interaction.options.getMember('target');
+        const targetUser = interaction.options.getUser('target');
         const reason = interaction.options.getString('reason');
         const moderator = interaction.user;
 
-        db.prepare('INSERT INTO warnings (userId, guildId, reason, moderatorId) VALUES (?, ?, ?, ?)').run(
-            target.id,
-            interaction.guild.id,
-            reason,
-            moderator.id
-        );
+        if (!targetMember) {
+            return interaction.reply({ content: 'That user is not in this server.', ephemeral: true });
+        }
 
-        const warningCount = db.prepare('SELECT COUNT(*) as count FROM warnings WHERE userId = ? AND guildId = ?').get(target.id, interaction.guild.id).count;
+        const member = new Member(targetMember);
+        member.addWarning(reason, moderator.id);
+        const warningCount = member.getWarnings().length;
 
-        await interaction.reply({ content: `Successfully warned ${target.tag} for: ${reason}. They now have ${warningCount} warning(s).` });
+        await interaction.reply({ content: `Successfully warned ${targetUser.tag} for: ${reason}. They now have ${warningCount} warning(s).` });
+
+        await loggingService.log(interaction.guild, {
+            title: 'Member Warned',
+            description: `${targetUser.tag} was warned by ${moderator.tag}.`,
+            color: 0xFEE75C,
+            eventType: 'log_events_moderation',
+            user: targetUser,
+            fields: [
+                { name: 'Reason', value: reason },
+                { name: 'Total Warnings', value: String(warningCount) },
+                { name: 'Warned By', value: `${moderator.tag} (\`${moderator.id}\`)` }
+            ]
+        });
     },
 };

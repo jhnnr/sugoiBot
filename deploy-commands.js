@@ -1,8 +1,12 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { REST, Routes } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config();
 
 export async function deployCommands() {
     const commands = [];
@@ -29,24 +33,31 @@ export async function deployCommands() {
     }
 
     const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+    const clientId = process.env.CLIENT_ID?.trim()?.replace(/^["']|["']$/g, '');
+    const guildId = process.env.GUILD_ID?.trim()?.replace(/^["']|["']$/g, '');
+
+    if (!clientId) {
+        console.error('[ERROR] Cannot deploy commands: CLIENT_ID is not configured.');
+        return;
+    }
 
     try {
         console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-        // The user specifically asked to delete existing ones first.
-        // Putting an empty array to the global endpoint clears them.
-        await rest.put(
-            Routes.applicationCommands(process.env.CLIENT_ID),
-            { body: [] },
-        );
-        console.log('Successfully cleared existing application (/) commands.');
-
-        // Now deploy the fresh ones.
-        await rest.put(
-            Routes.applicationCommands(process.env.CLIENT_ID),
-            { body: commands },
-        );
-        console.log('Successfully reloaded application (/) commands.');
+        // Discord's PUT endpoint atomically replaces all commands in one request without rate-limit stalls
+        if (guildId && guildId !== 'your_test_guild_id_here') {
+            await rest.put(
+                Routes.applicationGuildCommands(clientId, guildId),
+                { body: commands },
+            );
+            console.log(`Successfully deployed ${commands.length} application (/) commands to guild ${guildId}.`);
+        } else {
+            await rest.put(
+                Routes.applicationCommands(clientId),
+                { body: commands },
+            );
+            console.log(`Successfully reloaded ${commands.length} application (/) commands globally.`);
+        }
     } catch (error) {
         console.error('Error deploying commands:', error);
     }

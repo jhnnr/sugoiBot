@@ -7,6 +7,14 @@ nav:
   - Guides:
     - Creating Modules: creating-modules.md
 
+  - Modules:
+    - Core: modules/core.md
+    - Economy: modules/economy.md
+    - GameRole: modules/gamerole.md
+    - General: modules/general.md
+    - Moderation: modules/moderation.md
+    - Voice: modules/voice.md
+    - XP: modules/xp.md
 markdown_extensions:
   - admonition
   - pymdownx.highlight:

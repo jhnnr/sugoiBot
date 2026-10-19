@@ -65,4 +65,26 @@ describe('Member', () => {
         expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO currency'));
         expect(mockRun).toHaveBeenCalledWith('123', 150, 0, 0);
     });
+
+    it('getWarnings should query warnings table for member and guild', () => {
+        const mockWarnings = [{ id: 1, reason: 'Spamming' }];
+        db.prepare.mockReturnValue({
+            all: vi.fn().mockReturnValue(mockWarnings)
+        });
+
+        const warnings = member.getWarnings();
+        expect(warnings).toEqual(mockWarnings);
+        expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('SELECT * FROM warnings WHERE userId = ? AND guildId = ?'));
+    });
+
+    it('addWarning should insert warning into warnings table', () => {
+        const mockRun = vi.fn();
+        db.prepare.mockReturnValue({
+            run: mockRun
+        });
+
+        member.addWarning('Inappropriate language', 'mod999');
+        expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO warnings'));
+        expect(mockRun).toHaveBeenCalledWith('123', '456', 'Inappropriate language', 'mod999');
+    });
 });

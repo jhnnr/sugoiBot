@@ -32,8 +32,11 @@ export default {
             title: 'Member Banned',
             description: `${target.user.tag} was banned by ${interaction.user.tag}.`,
             color: 0xFF0000,
+            eventType: 'log_events_moderation',
+            user: target.user,
             fields: [
-                { name: 'Reason', value: reason }
+                { name: 'Reason', value: reason },
+                { name: 'Banned By', value: `${interaction.user.tag} (\`${interaction.user.id}\`)` }
             ]
         });
     },

@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
 import { Member } from '../../../lib/classes/Member.js';
+import { generateRankCard } from '../../../lib/utils/rankCard.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -14,14 +15,11 @@ export default {
         const data = member.getXP();
 
         const getNeededXP = (lvl) => lvl * lvl * 100;
+        const neededXP = getNeededXP(data.level);
 
-        const embed = new EmbedBuilder()
-            .setTitle(`${targetUser.username}'s Rank`)
-            .addFields(
-                { name: 'Level', value: String(data.level), inline: true },
-                { name: 'XP', value: `${data.xp} / ${getNeededXP(data.level)}`, inline: true }
-            );
+        const cardBuffer = await generateRankCard(targetUser, data, neededXP);
+        const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank.png' });
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ files: [attachment] });
     },
 };

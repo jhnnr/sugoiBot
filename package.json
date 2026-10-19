@@ -7,13 +7,16 @@
     "start": "node main.js",
     "deploy": "node deploy-commands.js",
     "test": "vitest run",
-    "dashboard": "node dashboard/server.js"
+    "dashboard": "node dashboard/server.js",
+    "docs:generate": "node scripts/generate-docs.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "better-sqlite3": "^11.8.1",
+    "@napi-rs/canvas": "^1.0.11",
+    "better-sqlite3": "^13.0.3",
+    "cookie-parser": "^1.4.7",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
     "express": "^5.2.1"

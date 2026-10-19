@@ -1,7 +1,15 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config();
+
 import { GigaClient } from './lib/bot/GigaClient.js';
 import { loadModules } from './handlers/moduleHandler.js';
 import { deployCommands } from './deploy-commands.js';
+import { startDashboard } from './dashboard/server.js';
 
 const client = new GigaClient();
 
@@ -15,8 +23,12 @@ process.on('uncaughtException', (error) => {
 
 async function start() {
     client.logger.info('Starting Sugoi Bot...');
-    await deployCommands();
+    startDashboard();
     await loadModules(client);
+    
+    // Deploy commands without blocking bot startup
+    deployCommands().catch(err => client.logger.error('Failed to deploy application commands:', err));
+
     await client.login(process.env.DISCORD_TOKEN);
 }
 

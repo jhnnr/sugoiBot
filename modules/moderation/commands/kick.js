@@ -32,8 +32,11 @@ export default {
             title: 'Member Kicked',
             description: `${target.user.tag} was kicked by ${interaction.user.tag}.`,
             color: 0xFFA500,
+            eventType: 'log_events_moderation',
+            user: target.user,
             fields: [
-                { name: 'Reason', value: reason }
+                { name: 'Reason', value: reason },
+                { name: 'Kicked By', value: `${interaction.user.tag} (\`${interaction.user.id}\`)` }
             ]
         });
     },
