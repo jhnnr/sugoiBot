@@ -35,7 +35,8 @@ describe('Voice Module', () => {
             },
             setName: vi.fn().mockResolvedValue(true),
             setUserLimit: vi.fn().mockResolvedValue(true),
-            delete: vi.fn().mockResolvedValue(true)
+            delete: vi.fn().mockResolvedValue(true),
+            send: vi.fn().mockResolvedValue(true)
         };
 
         mockMember = {

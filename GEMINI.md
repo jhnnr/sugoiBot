@@ -224,5 +224,3 @@ This boilerplate synthesizes:
 
 Read once. Edit sections 10 and 11 for your project. Prune the rest over time. This file gets better the more you use it.
 
-
-gemini --resume '56494210-d80d-46e7-bcd9-063584d777e4'

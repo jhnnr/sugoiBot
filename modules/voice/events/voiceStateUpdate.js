@@ -96,9 +96,11 @@ export default {
                 await member.voice.setChannel(newChannel.id).catch(() => {});
 
                 // Send control interface directly in the new voice channel's chat box!
-                const embed = createVoiceInterfaceEmbed();
-                const components = createVoiceInterfaceComponents();
-                await newChannel.send({ embeds: [embed], components }).catch(() => {});
+                if (typeof newChannel.send === 'function') {
+                    const embed = createVoiceInterfaceEmbed();
+                    const components = createVoiceInterfaceComponents();
+                    await newChannel.send({ embeds: [embed], components }).catch(() => {});
+                }
             }
 
             // --- 2. AUTO-DELETE (When temporary room becomes empty) ---

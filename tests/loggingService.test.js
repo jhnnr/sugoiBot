@@ -83,6 +83,7 @@ describe('Logging Service', () => {
     });
 
     it('should not throw if channel cannot be resolved', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         SettingsManager.getGuild.mockReturnValue('non_existent_channel');
         mockGuild.channels.cache.clear();
         mockGuild.channels.fetch.mockResolvedValue(null);
@@ -92,5 +93,6 @@ describe('Logging Service', () => {
         })).resolves.not.toThrow();
 
         expect(mockSend).not.toHaveBeenCalled();
+        warnSpy.mockRestore();
     });
 });
