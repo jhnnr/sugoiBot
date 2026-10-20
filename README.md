@@ -134,12 +134,6 @@ docker build -t sugoibot .
 docker run -d --name sugoibot --env-file .env -p 3000:3000 -v $(pwd)/data:/app/data sugoibot
 ```
 
-### Multi-Architecture Builds
-Using Docker Buildx:
-```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t your-username/sugoibot:latest .
-```
-
 ---
 
 ## 🧩 Adding a New Module

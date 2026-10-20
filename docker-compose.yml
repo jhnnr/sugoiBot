@@ -1,10 +1,10 @@
 services:
   sugoibot:
-    image: ${DOCKER_IMAGE:-sugoides/sugoibot:latest}
+    image: sugoi13/sugoibot:latest
     container_name: sugoibot
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - "3000:3000"
     env_file:
       - .env
     environment:
@@ -12,3 +12,8 @@ services:
       - PORT=3000
     volumes:
       - ./data:/app/data
+    networks:
+      - sugoibot
+networks:
+  sugoibot:
+    driver: bridge
