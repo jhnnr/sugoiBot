@@ -25,12 +25,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Install runtime certificates
+# Install runtime certificates and gosu for non-root privilege management
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# Setup data volume directory with proper permissions for non-root node user
+# Create data directory with initial permissions
 RUN mkdir -p /app/data && chown -R node:node /app
 
 # Copy production node_modules from builder
@@ -39,12 +40,14 @@ COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 # Copy application source code
 COPY --chown=node:node . .
 
-# Run as non-root user
-USER node
+# Setup entrypoint script for runtime volume permission resolution
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 3000
 
 # Mount persistent SQLite database directory
 VOLUME ["/app/data"]
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["node", "main.js"]
