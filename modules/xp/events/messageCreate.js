@@ -21,7 +21,16 @@ export default {
         const result = await member.addXP(xpToAdd);
 
         if (result.leveledUp) {
-            await message.reply(`Congrats ${message.author}! Level up to **${result.level}**!`);
+            const rawChannel = SettingsManager.getGuild(message.guild.id, 'xp_channel_id');
+            const targetChannelId = rawChannel ? String(rawChannel).replace(/^["']|["']$/g, '').trim() : '';
+            const targetChannel = targetChannelId ? (message.guild.channels.cache.get(targetChannelId) || await message.guild.channels.fetch(targetChannelId).catch(() => null)) : null;
+
+            const congratsText = `Congrats ${message.author}! Level up to **${result.level}**!`;
+            if (targetChannel && typeof targetChannel.send === 'function') {
+                await targetChannel.send(congratsText).catch(() => message.reply(congratsText));
+            } else {
+                await message.reply(congratsText);
+            }
         }
     },
 };

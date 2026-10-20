@@ -20,9 +20,9 @@ A modern, modular, and scalable Discord bot framework and web dashboard built wi
   - Command execution tracking (captures the full command with subcommands and arguments)
   - Diagnostic verification command (`/testlog`)
 - **💰 Economy System**: Coins and balance management (`/balance`, `/daily`, `/work`, and `/coinflip` betting).
-- **🛡️ Moderation Tools**: Administrative actions (`/ban`, `/kick`, `/warn`, `/clear`).
-- **⚙️ Per-Guild Settings Framework**: Robust SQLite database management with atomic transactions and individual module enable/disable switches.
-- **🧪 Comprehensive Test Suite**: 86 unit and integration tests across 15 test suites powered by Vitest.
+- **🛡️ Moderation Tools**: Administrative actions (`/ban`, `/kick`, `/warn`, `/clear`, `/setlog`, `/testlog`).
+- **⚙️ Dynamic Module Settings & Per-Guild Framework**: Robust SQLite database management with atomic batch transactions (`SettingsManager.setGuildMany`), dynamic schema registration, and module enable/disable switches.
+- **🧪 Comprehensive Test Suite**: 90 unit and integration tests across 15 test suites powered by Vitest.
 - **📚 Automated Documentation**: Automatically scans modules and syncs markdown pages with MkDocs (`npm run docs:generate`).
 
 ---

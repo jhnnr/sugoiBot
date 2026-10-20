@@ -25,7 +25,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-primary);
             color: var(--text-normal);
-            padding: 2rem 1rem;
+            padding: 2rem 1rem 6rem 1rem;
             display: flex;
             justify-content: center;
             min-height: 100vh;
@@ -104,12 +104,7 @@
             border: none;
             cursor: pointer;
         }
-        .btn-discord:hover {
-            background-color: var(--accent-hover);
-        }
-        .btn-discord:active {
-            transform: scale(0.98);
-        }
+        .btn-discord:hover { background-color: var(--accent-hover); }
         .btn-secondary {
             background-color: transparent;
             color: var(--text-muted);
@@ -139,13 +134,9 @@
         .hero-icon {
             width: 80px;
             height: 80px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #5865F2, #854CE6);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            box-shadow: 0 4px 16px rgba(88, 101, 242, 0.4);
         }
         .hero-title {
             font-size: 2.2rem;
@@ -286,9 +277,7 @@
             color: var(--text-muted);
             margin-top: 0.2rem;
         }
-        .server-status.present {
-            color: var(--success);
-        }
+        .server-status.present { color: var(--success); }
         .btn-invite {
             font-size: 0.75rem;
             padding: 0.3rem 0.6rem;
@@ -322,6 +311,12 @@
             border-radius: 8px;
             border: 1px solid var(--border);
         }
+        .module-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
         .checkbox-row {
             display: flex;
             align-items: flex-start;
@@ -344,6 +339,26 @@
             color: var(--text-muted);
             margin-top: 0.15rem;
         }
+        .btn-module-settings {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-normal);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-shrink: 0;
+        }
+        .btn-module-settings:hover {
+            border-color: var(--accent);
+            color: var(--text-heading);
+            background-color: rgba(88, 101, 242, 0.1);
+        }
         label {
             font-weight: 600;
             font-size: 0.95rem;
@@ -353,7 +368,7 @@
             font-size: 0.8rem;
             color: var(--text-muted);
         }
-        input[type="text"], input[type="number"] {
+        input[type="text"], input[type="number"], select {
             background-color: var(--bg-primary);
             border: 1px solid var(--border);
             color: var(--text-heading);
@@ -362,34 +377,22 @@
             font-size: 0.95rem;
             outline: none;
             transition: border-color 0.2s;
+            width: 100%;
         }
-        input[type="text"]:focus, input[type="number"]:focus {
+        select {
+            cursor: pointer;
+        }
+        select option {
+            background-color: var(--bg-secondary);
+            color: var(--text-heading);
+        }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
             border-color: var(--accent);
         }
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
-        }
-        .btn-save {
-            background-color: var(--accent);
-            color: #ffffff;
-            border: none;
-            padding: 0.85rem 1.5rem;
-            font-size: 1rem;
-            font-weight: 600;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            margin-top: 1rem;
-            width: 100%;
-        }
-        .btn-save:hover {
-            background-color: var(--accent-hover);
-        }
-        .btn-save:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
         }
         .alert {
             padding: 0.85rem 1.2rem;
@@ -414,6 +417,220 @@
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
             font-size: 0.8rem;
+        }
+        /* Modal Dialog Styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+        .modal-box {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes modalIn {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            font-size: 1.2rem;
+            color: var(--text-heading);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal-close:hover { color: var(--text-heading); }
+        .modal-body {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            background-color: var(--bg-tertiary);
+            display: flex;
+            justify-content: flex-end;
+        }
+        /* Floating Sticky Save Bar */
+        .floating-save-bar {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(200%);
+            background-color: rgba(18, 19, 22, 0.95);
+            border: 1px solid var(--border);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 0.85rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+            width: 90%;
+            max-width: 680px;
+            z-index: 500;
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .floating-save-bar.visible {
+            transform: translateX(-50%) translateY(0);
+        }
+        .save-bar-text {
+            font-weight: 600;
+            color: var(--text-heading);
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .save-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .btn-reset {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-normal);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-reset:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-heading);
+        }
+        .btn-save-floating {
+            background-color: var(--success);
+            color: #ffffff;
+            border: none;
+            padding: 0.5rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-save-floating:hover { background-color: #1e8e4e; }
+        .btn-save-floating:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* Searchable Combobox Styles */
+        .combobox-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        .combobox-input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+        .combobox-input {
+            width: 100%;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-heading);
+            padding: 0.65rem 2.2rem 0.65rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .combobox-input:focus {
+            border-color: var(--accent);
+        }
+        .combobox-arrow {
+            position: absolute;
+            right: 0.85rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+        .combobox-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+        .combobox-dropdown.open {
+            display: block;
+        }
+        .combobox-item {
+            padding: 0.6rem 0.85rem;
+            font-size: 0.92rem;
+            color: var(--text-normal);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.15s, color 0.15s;
+        }
+        .combobox-item:hover {
+            background-color: rgba(88, 101, 242, 0.15);
+            color: var(--text-heading);
+        }
+        .combobox-item.selected {
+            background-color: rgba(88, 101, 242, 0.25);
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .combobox-item-id {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+        .combobox-empty {
+            padding: 0.75rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
         }
     </style>
 </head>
@@ -502,61 +719,98 @@
         <section class="card" id="settingsCard" style="display: none;">
             <h2>
                 <span id="selectedServerTitle">Server Settings</span>
-                <span class="badge" id="selectedServerBadge">Global</span>
+                <span class="badge" id="selectedServerBadge">ID</span>
             </h2>
             <form id="settingsForm">
                 <h3 class="section-title">Active Modules</h3>
-                <p class="help-text" style="margin-bottom: 0.75rem;">Enable or disable entire modules for this server:</p>
+                <p class="help-text" style="margin-bottom: 0.75rem;">Enable or disable entire modules and access module-specific configuration:</p>
+                
                 <div class="checkboxes-list" style="margin-bottom: 1.5rem;">
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="module_general_enabled" name="module_general_enabled">
-                        <label for="module_general_enabled">
-                            <div class="checkbox-label-title">General Module</div>
-                            <div class="checkbox-label-desc">General bot utilities like /ping.</div>
-                        </label>
+                    <!-- General Module -->
+                    <div class="module-row">
+                        <div class="checkbox-row" style="flex: 1;">
+                            <input type="checkbox" id="module_general_enabled" name="module_general_enabled">
+                            <label for="module_general_enabled">
+                                <div class="checkbox-label-title">General Module</div>
+                                <div class="checkbox-label-desc">General bot utilities like /ping.</div>
+                            </label>
+                        </div>
                     </div>
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="module_economy_enabled" name="module_economy_enabled">
-                        <label for="module_economy_enabled">
-                            <div class="checkbox-label-title">Economy Module</div>
-                            <div class="checkbox-label-desc">Currency commands: /balance, /daily, /work, and /coinflip.</div>
-                        </label>
+
+                    <!-- Economy Module -->
+                    <div class="module-row">
+                        <div class="checkbox-row" style="flex: 1;">
+                            <input type="checkbox" id="module_economy_enabled" name="module_economy_enabled">
+                            <label for="module_economy_enabled">
+                                <div class="checkbox-label-title">Economy Module</div>
+                                <div class="checkbox-label-desc">Currency commands: /balance, /daily, /work, and /coinflip.</div>
+                            </label>
+                        </div>
                     </div>
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="module_moderation_enabled" name="module_moderation_enabled">
-                        <label for="module_moderation_enabled">
-                            <div class="checkbox-label-title">Moderation Module</div>
-                            <div class="checkbox-label-desc">Moderation tools: /ban, /kick, /warn, and /clear.</div>
-                        </label>
+
+                    <!-- Moderation Module -->
+                    <div class="module-row">
+                        <div class="checkbox-row" style="flex: 1;">
+                            <input type="checkbox" id="module_moderation_enabled" name="module_moderation_enabled">
+                            <label for="module_moderation_enabled">
+                                <div class="checkbox-label-title">Moderation Module</div>
+                                <div class="checkbox-label-desc">Moderation tools: /ban, /kick, /warn, /clear, and /setlog.</div>
+                            </label>
+                        </div>
                     </div>
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="module_xp_enabled" name="module_xp_enabled">
-                        <label for="module_xp_enabled">
-                            <div class="checkbox-label-title">XP & Leveling Module</div>
-                            <div class="checkbox-label-desc">Level progression, /rank, /leaderboard, and text & voice XP rewards.</div>
-                        </label>
+
+                    <!-- XP & Leveling Module (With Settings Button) -->
+                    <div class="module-row">
+                        <div class="checkbox-row" style="flex: 1;">
+                            <input type="checkbox" id="module_xp_enabled" name="module_xp_enabled">
+                            <label for="module_xp_enabled">
+                                <div class="checkbox-label-title">XP & Leveling Module</div>
+                                <div class="checkbox-label-desc">Level progression, /rank, /leaderboard, and text & voice XP rewards.</div>
+                            </label>
+                        </div>
+                        <button type="button" class="btn-module-settings" onclick="openModal('xpModal')">⚙️ Settings</button>
                     </div>
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="module_gamerole_enabled" name="module_gamerole_enabled">
-                        <label for="module_gamerole_enabled">
-                            <div class="checkbox-label-title">GameRole Module</div>
-                            <div class="checkbox-label-desc">Automatically gives and removes roles to users based on what game they are playing.</div>
-                        </label>
+
+                    <!-- GameRole Module -->
+                    <div class="module-row">
+                        <div class="checkbox-row" style="flex: 1;">
+                            <input type="checkbox" id="module_gamerole_enabled" name="module_gamerole_enabled">
+                            <label for="module_gamerole_enabled">
+                                <div class="checkbox-label-title">GameRole Module</div>
+                                <div class="checkbox-label-desc">Automatically assigns and removes roles based on member playing status.</div>
+                            </label>
+                        </div>
                     </div>
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="module_voice_enabled" name="module_voice_enabled">
-                        <label for="module_voice_enabled">
-                            <div class="checkbox-label-title">Temporary Voice Module</div>
-                            <div class="checkbox-label-desc">Dynamic Join-to-Create temporary voice rooms with in-chat control interface.</div>
-                        </label>
+
+                    <!-- Temporary Voice Module (With Settings Button) -->
+                    <div class="module-row">
+                        <div class="checkbox-row" style="flex: 1;">
+                            <input type="checkbox" id="module_voice_enabled" name="module_voice_enabled">
+                            <label for="module_voice_enabled">
+                                <div class="checkbox-label-title">Temporary Voice Module</div>
+                                <div class="checkbox-label-desc">Dynamic Join-to-Create temporary voice rooms with in-chat control interface.</div>
+                            </label>
+                        </div>
+                        <button type="button" class="btn-module-settings" onclick="openModal('voiceModal')">⚙️ Settings</button>
                     </div>
                 </div>
 
                 <h3 class="section-title">Log Destination</h3>
                 <div class="form-group">
-                    <label for="log_channel_id">Log Channel ID</label>
-                    <input type="text" id="log_channel_id" name="log_channel_id" placeholder="Discord Channel ID (e.g. 123456789012345678)">
-                    <span class="help-text">The text channel where SugoiBot posts server audit logs and alerts.</span>
+                    <label for="log_channel_search">Log Channel</label>
+                    <div class="combobox-wrapper" id="logChannelComboboxWrapper">
+                        <div class="combobox-input-container">
+                            <input type="text" 
+                                   class="combobox-input" 
+                                   id="log_channel_search" 
+                                   placeholder="Filter channels or enter ID..." 
+                                   autocomplete="off">
+                            <span class="combobox-arrow">▼</span>
+                        </div>
+                        <input type="hidden" id="log_channel_id" name="log_channel_id">
+                        <div class="combobox-dropdown" id="log_channel_dropdown"></div>
+                    </div>
+                    <span class="help-text">Type to filter channels by name (#channel) or select from the dropdown.</span>
                 </div>
 
                 <h3 class="section-title">Event Logging Options</h3>
@@ -608,47 +862,103 @@
                         <input type="checkbox" id="log_events_voice" name="log_events_voice">
                         <label for="log_events_voice">
                             <div class="checkbox-label-title">Voice State Updates</div>
-                            <div class="checkbox-label-desc">Logs when users join, leave, or switch voice channels.</div>
+                            <div class="checkbox-label-desc">Logs when users join, leave, or switch voice channels (including mover identification).</div>
                         </label>
                     </div>
                     <div class="checkbox-row">
                         <input type="checkbox" id="log_events_commands" name="log_events_commands">
                         <label for="log_events_commands">
                             <div class="checkbox-label-title">Command Execution</div>
-                            <div class="checkbox-label-desc">Logs whenever a user invokes a slash command in the server.</div>
+                            <div class="checkbox-label-desc">Logs whenever a user invokes a slash command with full subcommands and arguments.</div>
                         </label>
                     </div>
                 </div>
 
-                <h3 class="section-title">XP & Leveling</h3>
-                <div class="checkboxes-list" style="margin-bottom: 1rem;">
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="xp_enabled" name="xp_enabled">
-                        <label for="xp_enabled">
-                            <div class="checkbox-label-title">Enable XP & Leveling in this server</div>
-                            <div class="checkbox-label-desc">Awards XP for chat messages and time spent in voice channels.</div>
-                        </label>
-                    </div>
-                </div>
+                <div class="alert" id="alertBox"></div>
+            </form>
+        </section>
+    </div>
+
+    <!-- XP & Leveling Module Settings Modal -->
+    <div class="modal-backdrop" id="xpModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>⭐ XP & Leveling Settings</h3>
+                <button type="button" class="modal-close" onclick="closeModal('xpModal')">&times;</button>
+            </div>
+            <div class="modal-body">
                 <div class="grid-2">
                     <div class="form-group">
                         <label for="xp_min">Min XP Per Message</label>
-                        <input type="number" id="xp_min" name="xp_min" min="1">
+                        <input type="number" id="xp_min" name="xp_min" min="1" form="settingsForm">
                     </div>
                     <div class="form-group">
                         <label for="xp_max">Max XP Per Message</label>
-                        <input type="number" id="xp_max" name="xp_max" min="1">
+                        <input type="number" id="xp_max" name="xp_max" min="1" form="settingsForm">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="xp_voice_per_minute">Voice XP (Per Minute)</label>
-                    <input type="number" id="xp_voice_per_minute" name="xp_voice_per_minute" min="0">
+                    <input type="number" id="xp_voice_per_minute" name="xp_voice_per_minute" min="0" form="settingsForm">
+                    <span class="help-text">XP awarded per minute spent active in voice channels.</span>
                 </div>
+                <div class="form-group">
+                    <label for="xp_channel_search">Level-Up Log Channel</label>
+                    <div class="combobox-wrapper" id="xpChannelComboboxWrapper">
+                        <div class="combobox-input-container">
+                            <input type="text" 
+                                   class="combobox-input" 
+                                   id="xp_channel_search" 
+                                   placeholder="Filter channels or enter ID..." 
+                                   autocomplete="off">
+                            <span class="combobox-arrow">▼</span>
+                        </div>
+                        <input type="hidden" id="xp_channel_id" name="xp_channel_id" form="settingsForm">
+                        <div class="combobox-dropdown" id="xp_channel_dropdown"></div>
+                    </div>
+                    <span class="help-text">Specific text channel where congratulations level-up announcements are sent.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-save-floating" onclick="closeModal('xpModal')">Done</button>
+            </div>
+        </div>
+    </div>
 
-                <button type="submit" class="btn-save" id="saveBtn">Save Server Settings</button>
-                <div class="alert" id="alertBox"></div>
-            </form>
-        </section>
+    <!-- Temporary Voice Module Settings Modal -->
+    <div class="modal-backdrop" id="voiceModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>🔊 Temporary Voice Settings</h3>
+                <button type="button" class="modal-close" onclick="closeModal('voiceModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="voice_naming_scheme">Channel Name Template</label>
+                    <input type="text" id="voice_naming_scheme" name="voice_naming_scheme" placeholder="{username}'s Room" form="settingsForm">
+                    <span class="help-text">Template used when spawning new temporary rooms. Use <code>{username}</code> as placeholder.</span>
+                </div>
+                <div class="form-group">
+                    <label for="voice_default_limit">Default Room Limit</label>
+                    <input type="number" id="voice_default_limit" name="voice_default_limit" min="0" max="99" form="settingsForm">
+                    <span class="help-text">Default participant cap for newly spawned rooms (0 for unlimited).</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-save-floating" onclick="closeModal('voiceModal')">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Sticky Save Bar (Follows Scroll, Appears on Unsaved Changes) -->
+    <div class="floating-save-bar" id="floatingSaveBar">
+        <div class="save-bar-text">
+            <span>⚠️ Careful — you have unsaved changes!</span>
+        </div>
+        <div class="save-bar-actions">
+            <button type="button" class="btn-reset" id="resetBtn">Reset</button>
+            <button type="submit" form="settingsForm" class="btn-save-floating" id="saveFloatingBtn">Save Changes</button>
+        </div>
     </div>
 
     <script>
@@ -663,9 +973,12 @@
         const selectedServerTitle = document.getElementById('selectedServerTitle');
         const selectedServerBadge = document.getElementById('selectedServerBadge');
         const alertBox = document.getElementById('alertBox');
-        const saveBtn = document.getElementById('saveBtn');
+        const floatingSaveBar = document.getElementById('floatingSaveBar');
+        const saveFloatingBtn = document.getElementById('saveFloatingBtn');
+        const resetBtn = document.getElementById('resetBtn');
 
         let currentGuildId = null;
+        let originalFormState = {};
 
         function showAlert(msg, isSuccess) {
             alertBox.textContent = msg;
@@ -673,6 +986,80 @@
             alertBox.style.display = 'block';
             setTimeout(() => { alertBox.style.display = 'none'; }, 4500);
         }
+
+        // Modal Controls
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.style.display = 'none';
+            checkFormChanges();
+        }
+
+        // Close on backdrop click
+        document.querySelectorAll('.modal-backdrop').forEach(b => {
+            b.addEventListener('click', (e) => {
+                if (e.target === b) {
+                    b.style.display = 'none';
+                    checkFormChanges();
+                }
+            });
+        });
+
+        // Unsaved Changes Tracking
+        function captureFormState() {
+            const state = {};
+            const form = document.getElementById('settingsForm');
+            const inputs = form.querySelectorAll('input, select');
+            inputs.forEach(el => {
+                const id = el.id || el.name;
+                if (!id) return;
+                state[id] = el.type === 'checkbox' ? el.checked : el.value;
+            });
+            return state;
+        }
+
+        function checkFormChanges() {
+            if (!currentGuildId) {
+                floatingSaveBar.classList.remove('visible');
+                return;
+            }
+            const current = captureFormState();
+            let changed = false;
+            for (const key of Object.keys(originalFormState)) {
+                if (originalFormState[key] !== current[key]) {
+                    changed = true;
+                    break;
+                }
+            }
+            if (changed) {
+                floatingSaveBar.classList.add('visible');
+            } else {
+                floatingSaveBar.classList.remove('visible');
+            }
+        }
+
+        function resetFormChanges() {
+            const form = document.getElementById('settingsForm');
+            const inputs = form.querySelectorAll('input, select');
+            inputs.forEach(el => {
+                const id = el.id || el.name;
+                if (!id || originalFormState[id] === undefined) return;
+                if (el.type === 'checkbox') {
+                    el.checked = originalFormState[id];
+                } else {
+                    el.value = originalFormState[id];
+                }
+            });
+            checkFormChanges();
+        }
+
+        resetBtn.addEventListener('click', resetFormChanges);
+        document.getElementById('settingsForm').addEventListener('input', checkFormChanges);
+        document.getElementById('settingsForm').addEventListener('change', checkFormChanges);
 
         function loadStats() {
             fetch('/api/stats')
@@ -721,7 +1108,6 @@
                 window.location.reload();
             });
 
-            // Show authenticated dashboard content, hide landing login hero
             landingLoginCard.style.display = 'none';
             statsGrid.style.display = 'grid';
             serversSection.style.display = 'block';
@@ -729,10 +1115,10 @@
 
         function renderLoggedOut() {
             authSection.innerHTML = '';
-            // Hide dashboard sections, show landing login page
             statsGrid.style.display = 'none';
             serversSection.style.display = 'none';
             settingsCard.style.display = 'none';
+            floatingSaveBar.classList.remove('visible');
             landingLoginCard.style.display = 'flex';
         }
 
@@ -791,6 +1177,141 @@
             }
         }
 
+        function setupChannelCombobox({
+            wrapperId,
+            searchInputId,
+            hiddenInputId,
+            dropdownId,
+            defaultLabel
+        }) {
+            const wrapper = document.getElementById(wrapperId);
+            const searchInput = document.getElementById(searchInputId);
+            const hiddenInput = document.getElementById(hiddenInputId);
+            const dropdown = document.getElementById(dropdownId);
+            let allChannels = [];
+
+            function render(filter = '') {
+                const query = filter.toLowerCase().trim();
+                const filtered = allChannels.filter(c => 
+                    c.name.toLowerCase().includes(query) || c.id.includes(query)
+                );
+
+                dropdown.innerHTML = '';
+
+                // Default null/disabled item
+                const defaultItem = document.createElement('div');
+                defaultItem.className = 'combobox-item' + (!hiddenInput.value ? ' selected' : '');
+                defaultItem.innerHTML = `<span>${defaultLabel}</span>`;
+                defaultItem.addEventListener('click', () => {
+                    selectItem('', defaultLabel);
+                });
+                dropdown.appendChild(defaultItem);
+
+                if (filtered.length === 0 && query) {
+                    if (/^\d{17,20}$/.test(query)) {
+                        const customItem = document.createElement('div');
+                        customItem.className = 'combobox-item';
+                        customItem.innerHTML = `<span>Custom ID: <strong>${query}</strong></span>`;
+                        customItem.addEventListener('click', () => {
+                            selectItem(query, `Channel ID: ${query}`);
+                        });
+                        dropdown.appendChild(customItem);
+                    } else {
+                        const empty = document.createElement('div');
+                        empty.className = 'combobox-empty';
+                        empty.textContent = 'No matching channels found';
+                        dropdown.appendChild(empty);
+                    }
+                } else {
+                    for (const ch of filtered) {
+                        const item = document.createElement('div');
+                        item.className = 'combobox-item' + (hiddenInput.value === ch.id ? ' selected' : '');
+                        item.innerHTML = `<span>#${ch.name}</span><span class="combobox-item-id">${ch.id}</span>`;
+                        item.addEventListener('click', () => {
+                            selectItem(ch.id, '#' + ch.name);
+                        });
+                        dropdown.appendChild(item);
+                    }
+                }
+            }
+
+            function selectItem(id, displayText) {
+                hiddenInput.value = id;
+                searchInput.value = id ? displayText : '';
+                dropdown.classList.remove('open');
+                checkFormChanges();
+            }
+
+            searchInput.addEventListener('focus', () => {
+                const query = searchInput.value.startsWith('#') ? '' : searchInput.value;
+                render(query);
+                dropdown.classList.add('open');
+            });
+
+            searchInput.addEventListener('input', () => {
+                const query = searchInput.value;
+                render(query.startsWith('#') ? query.slice(1) : query);
+                dropdown.classList.add('open');
+
+                if (/^\d{17,20}$/.test(query.trim())) {
+                    hiddenInput.value = query.trim();
+                } else if (!query.trim()) {
+                    hiddenInput.value = '';
+                }
+                checkFormChanges();
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#' + wrapperId)) {
+                    dropdown.classList.remove('open');
+                    if (hiddenInput.value) {
+                        const match = allChannels.find(c => c.id === hiddenInput.value);
+                        searchInput.value = match ? '#' + match.name : (hiddenInput.value ? `Channel ID: ${hiddenInput.value}` : '');
+                    } else {
+                        searchInput.value = '';
+                    }
+                }
+            });
+
+            return {
+                setChannels(channels, selectedId) {
+                    allChannels = channels || [];
+                    hiddenInput.value = selectedId || '';
+                    const match = allChannels.find(c => c.id === selectedId);
+                    if (match) {
+                        searchInput.value = '#' + match.name;
+                    } else if (selectedId) {
+                        searchInput.value = `Channel ID: ${selectedId}`;
+                    } else {
+                        searchInput.value = '';
+                    }
+                },
+                setLoading() {
+                    searchInput.value = '';
+                    searchInput.placeholder = 'Loading server channels...';
+                },
+                setReady() {
+                    searchInput.placeholder = 'Filter channels (#name) or enter ID...';
+                }
+            };
+        }
+
+        const logChannelCombobox = setupChannelCombobox({
+            wrapperId: 'logChannelComboboxWrapper',
+            searchInputId: 'log_channel_search',
+            hiddenInputId: 'log_channel_id',
+            dropdownId: 'log_channel_dropdown',
+            defaultLabel: 'No Log Channel (Logging Disabled)'
+        });
+
+        const xpChannelCombobox = setupChannelCombobox({
+            wrapperId: 'xpChannelComboboxWrapper',
+            searchInputId: 'xp_channel_search',
+            hiddenInputId: 'xp_channel_id',
+            dropdownId: 'xp_channel_dropdown',
+            defaultLabel: 'Default (Current Channel / DM)'
+        });
+
         async function selectGuild(guildId, guildName) {
             currentGuildId = guildId;
 
@@ -802,12 +1323,34 @@
             selectedServerBadge.textContent = `ID: ${guildId}`;
             settingsCard.style.display = 'block';
 
-            try {
-                const res = await fetch(`/api/guilds/${guildId}/settings`);
-                if (!res.ok) throw new Error();
-                const data = await res.json();
-                const s = data.settings || {};
+            // Set loading state on comboboxes immediately while fetching
+            logChannelCombobox.setLoading();
+            xpChannelCombobox.setLoading();
 
+            try {
+                // Fetch settings and channels in parallel
+                const [settingsRes, channelsRes] = await Promise.all([
+                    fetch(`/api/guilds/${guildId}/settings`),
+                    fetch(`/api/guilds/${guildId}/channels`)
+                ]);
+
+                if (!settingsRes.ok) throw new Error('Settings fetch failed');
+                const sData = await settingsRes.json();
+                const s = sData.settings || {};
+
+                let channels = [];
+                if (channelsRes.ok) {
+                    const cData = await channelsRes.json();
+                    channels = cData.channels || [];
+                }
+
+                // Populate Searchable Comboboxes
+                logChannelCombobox.setReady();
+                xpChannelCombobox.setReady();
+                logChannelCombobox.setChannels(channels, s.log_channel_id || '');
+                xpChannelCombobox.setChannels(channels, s.xp_channel_id || '');
+
+                // Populate Module Checkboxes
                 document.getElementById('module_general_enabled').checked = s.module_general_enabled ?? true;
                 document.getElementById('module_economy_enabled').checked = s.module_economy_enabled ?? true;
                 document.getElementById('module_moderation_enabled').checked = s.module_moderation_enabled ?? true;
@@ -816,31 +1359,40 @@
                 const voiceVal = (s.module_voice_enabled !== undefined) ? s.module_voice_enabled : (s.module_voicemaster_enabled ?? true);
                 document.getElementById('module_voice_enabled').checked = Boolean(voiceVal);
 
-                document.getElementById('log_channel_id').value = s.log_channel_id || '';
+                // Populate Logging Checkboxes
                 document.getElementById('log_events_member_join').checked = s.log_events_member_join ?? true;
                 document.getElementById('log_events_member_leave').checked = s.log_events_member_leave ?? true;
                 document.getElementById('log_events_member_update').checked = s.log_events_member_update ?? true;
                 document.getElementById('log_events_message_delete').checked = s.log_events_message_delete ?? true;
+                document.getElementById('log_events_channels').checked = s.log_events_channels ?? true;
                 document.getElementById('log_events_moderation').checked = s.log_events_moderation ?? true;
                 document.getElementById('log_events_voice').checked = s.log_events_voice ?? false;
                 document.getElementById('log_events_commands').checked = s.log_events_commands ?? false;
 
-                document.getElementById('xp_enabled').checked = s.xp_enabled ?? true;
+                // Populate XP Settings Modal inputs
                 document.getElementById('xp_min').value = s.xp_min ?? 10;
                 document.getElementById('xp_max').value = s.xp_max ?? 20;
                 document.getElementById('xp_voice_per_minute').value = s.xp_voice_per_minute ?? 5;
-            } catch {
+
+                // Populate Voice Settings Modal inputs
+                document.getElementById('voice_naming_scheme').value = s.voice_naming_scheme || s.voicemaster_naming_scheme || "{username}'s Room";
+                document.getElementById('voice_default_limit').value = s.voice_default_limit ?? s.voicemaster_default_limit ?? 0;
+
+                // Capture initial state for change detection
+                originalFormState = captureFormState();
+                floatingSaveBar.classList.remove('visible');
+            } catch (err) {
                 showAlert('Failed to load settings for this server', false);
             }
         }
 
-        // Handle Save
+        // Handle Save Form
         document.getElementById('settingsForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!currentGuildId) return;
 
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
+            saveFloatingBtn.disabled = true;
+            saveFloatingBtn.textContent = 'Saving...';
 
             const payload = {
                 module_general_enabled: document.getElementById('module_general_enabled').checked,
@@ -853,17 +1405,20 @@
                 voice_enabled: document.getElementById('module_voice_enabled').checked,
                 voicemaster_enabled: document.getElementById('module_voice_enabled').checked,
                 log_channel_id: document.getElementById('log_channel_id').value.trim(),
+                xp_channel_id: document.getElementById('xp_channel_id').value.trim(),
                 log_events_member_join: document.getElementById('log_events_member_join').checked,
                 log_events_member_leave: document.getElementById('log_events_member_leave').checked,
                 log_events_member_update: document.getElementById('log_events_member_update').checked,
                 log_events_message_delete: document.getElementById('log_events_message_delete').checked,
+                log_events_channels: document.getElementById('log_events_channels').checked,
                 log_events_moderation: document.getElementById('log_events_moderation').checked,
                 log_events_voice: document.getElementById('log_events_voice').checked,
                 log_events_commands: document.getElementById('log_events_commands').checked,
-                xp_enabled: document.getElementById('xp_enabled').checked,
                 xp_min: Number(document.getElementById('xp_min').value),
                 xp_max: Number(document.getElementById('xp_max').value),
-                xp_voice_per_minute: Number(document.getElementById('xp_voice_per_minute').value)
+                xp_voice_per_minute: Number(document.getElementById('xp_voice_per_minute').value),
+                voice_naming_scheme: document.getElementById('voice_naming_scheme').value.trim(),
+                voice_default_limit: Number(document.getElementById('voice_default_limit').value)
             };
 
             try {
@@ -875,14 +1430,16 @@
                 const result = await res.json();
                 if (res.ok) {
                     showAlert('Server settings updated successfully!', true);
+                    originalFormState = captureFormState();
+                    floatingSaveBar.classList.remove('visible');
                 } else {
                     showAlert(result.error || 'Failed to save server settings', false);
                 }
             } catch (err) {
                 showAlert('Network error while saving settings', false);
             } finally {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save Server Settings';
+                saveFloatingBtn.disabled = false;
+                saveFloatingBtn.textContent = 'Save Changes';
             }
         });
 

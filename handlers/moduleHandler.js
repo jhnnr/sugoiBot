@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadCommands } from './commandHandler.js';
 import { loadEvents } from './eventHandler.js';
+import { SettingsManager } from '../lib/settings.js';
 
 export async function loadModules(client) {
     const modulesPath = path.join(process.cwd(), 'modules');
@@ -21,6 +22,10 @@ export async function loadModules(client) {
             const moduleUrl = pathToFileURL(indexPath).href;
             const moduleInfo = (await import(moduleUrl)).default;
             client.modules.set(moduleName, moduleInfo);
+
+            if (moduleInfo?.settings) {
+                SettingsManager.registerSchema(moduleInfo.settings);
+            }
         }
 
         // Delegate to specific handlers

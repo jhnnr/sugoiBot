@@ -193,4 +193,46 @@ describe('Moderation Module', () => {
             spy.mockRestore();
         });
     });
+
+    describe('/setlog', () => {
+        it('should configure log channel for the guild and dispatch test embed', async () => {
+            const { default: setlogCommand } = await import('../modules/moderation/commands/setlog.js');
+            const mockSend = vi.fn().mockResolvedValue(true);
+            const mockChannel = {
+                id: 'ch_target_888',
+                send: mockSend,
+                permissionsFor: () => ({
+                    has: () => true
+                })
+            };
+
+            const interaction = {
+                guild: {
+                    id: 'g200',
+                    name: 'Test Guild',
+                    members: { me: {} }
+                },
+                user: { tag: 'Admin#0001', displayAvatarURL: () => null },
+                options: {
+                    getChannel: vi.fn().mockReturnValue(mockChannel)
+                },
+                reply: vi.fn().mockResolvedValue(true)
+            };
+
+            const { SettingsManager } = await import('../lib/settings.js');
+            const setSpy = vi.spyOn(SettingsManager, 'setGuildJson').mockReturnValue();
+
+            await setlogCommand.execute(interaction);
+
+            expect(setSpy).toHaveBeenCalledWith('g200', 'log_channel_id', 'ch_target_888');
+            expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({
+                embeds: expect.any(Array)
+            }));
+            expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('Successfully configured <#ch_target_888>')
+            }));
+
+            setSpy.mockRestore();
+        });
+    });
 });

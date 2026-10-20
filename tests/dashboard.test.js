@@ -167,6 +167,7 @@ describe('Dashboard API', () => {
                 },
                 body: JSON.stringify({
                     log_channel_id: '987654321',
+                    xp_channel_id: '123456789',
                     log_events_member_join: true,
                     log_events_voice: true,
                     module_economy_enabled: false,
@@ -176,9 +177,27 @@ describe('Dashboard API', () => {
             expect(postRes.status).toBe(200);
             const postData = await postRes.json();
             expect(postData.settings.log_channel_id).toBe('987654321');
+            expect(postData.settings.xp_channel_id).toBe('123456789');
             expect(postData.settings.log_events_voice).toBe(true);
             expect(postData.settings.module_economy_enabled).toBe(false);
             expect(postData.settings.module_voice_enabled).toBe(false);
+
+            // Test GET /api/guilds/:guildId/channels
+            const channelsRes = await fetch(`${baseUrl}/api/guilds/${testGuildId}/channels`, {
+                headers: { Cookie: cookieHeader }
+            });
+            expect(channelsRes.status).toBe(200);
+            const channelsData = await channelsRes.json();
+            expect(channelsData).toHaveProperty('channels');
+        });
+
+        it('GET /api/modules discovers all modules and their metadata', async () => {
+            const res = await fetch(`${baseUrl}/api/modules`);
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.modules.length).toBeGreaterThan(0);
+            expect(data.modules.some(m => m.id === 'xp')).toBe(true);
+            expect(data.modules.some(m => m.id === 'voice')).toBe(true);
         });
     });
 });

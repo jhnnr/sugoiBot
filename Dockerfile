@@ -25,10 +25,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Install runtime certificates and gosu for non-root privilege management
+# Install runtime certificates, gosu, fontconfig and TrueType fonts for canvas text rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     gosu \
+    fontconfig \
+    fonts-dejavu-core \
+    fonts-noto-color-emoji \
+    && fc-cache -fv \
     && rm -rf /var/lib/apt/lists/*
 
 # Create data directory with initial permissions

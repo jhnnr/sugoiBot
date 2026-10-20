@@ -30,6 +30,14 @@ Kicks a member from the server.
 - `target` (Required): The member to kick
 - `reason` (Optional): The reason for kicking
 
+### `/setlog`
+
+Set the server audit log channel directly in this server.
+
+#### Options
+
+- `channel` (Required): The text channel to send server audit logs to
+
 ### `/testlog`
 
 Sends a test audit log message to verify your logging configuration.

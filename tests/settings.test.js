@@ -104,20 +104,68 @@ describe('SettingsManager', () => {
         expect(SettingsManager.validate('daily_amount', 'abc')).toBe(false);
     });
 
-    it('getGuild should fetch from guild_settings or fallback to global', () => {
+    it('registerSchema and getSchema should register and dynamically validate custom module settings', () => {
+        SettingsManager.registerSchema([
+            { key: 'custom_limit', type: 'number', min: 1, max: 50 },
+            { key: 'custom_enabled', type: 'boolean' },
+            { key: 'custom_channel', type: 'channel' }
+        ]);
+
+        expect(SettingsManager.getSchema('custom_limit')).toEqual(expect.objectContaining({ type: 'number' }));
+        expect(SettingsManager.validate('custom_limit', 25)).toBe(true);
+        expect(SettingsManager.validate('custom_limit', 100)).toBe(false);
+        expect(SettingsManager.validate('custom_limit', -5)).toBe(false);
+        expect(SettingsManager.validate('custom_limit', 'not-a-number')).toBe(false);
+
+        expect(SettingsManager.validate('custom_enabled', true)).toBe(true);
+        expect(SettingsManager.validate('custom_enabled', 'true')).toBe(false);
+
+        expect(SettingsManager.validate('custom_channel', '123456789')).toBe(true);
+        expect(SettingsManager.validate('custom_channel', 123456789)).toBe(false);
+    });
+
+    it('getModuleSchemas and getModuleSettings should retrieve all module settings for a guild', () => {
+        SettingsManager.registerSchema([
+            { key: 'xp_min', type: 'number', defaultValue: 10 },
+            { key: 'xp_max', type: 'number', defaultValue: 20 },
+            { key: 'xp_voice_per_minute', type: 'number', defaultValue: 5 }
+        ], 'xp');
+
+        const xpSchemas = SettingsManager.getModuleSchemas('xp');
+        expect(xpSchemas.length).toBeGreaterThanOrEqual(3);
+
+        db.prepare.mockReturnValue({
+            get: vi.fn().mockImplementation((guildId, key) => {
+                if (key === 'xp_min') return { value: '15' };
+                return null;
+            })
+        });
+
+        const guildXp = SettingsManager.getModuleSettings('guild_test_1', 'xp');
+        expect(guildXp.xp_min).toBe(15);
+        expect(guildXp.xp_max).toBe(20);
+    });
+
+    it('getGuild should fetch from guild_settings and strictly isolate log_channel_id', () => {
         // Guild specific found
         db.prepare.mockReturnValueOnce({
             get: vi.fn().mockReturnValue({ value: 'custom_log' })
         });
         expect(SettingsManager.getGuild('guild123', 'log_channel_id')).toBe('custom_log');
 
-        // Guild specific not found, fallback to global
+        // Guild specific not found for log_channel_id: returns null without global fallback
+        db.prepare.mockReturnValueOnce({
+            get: vi.fn().mockReturnValue(undefined)
+        });
+        expect(SettingsManager.getGuild('guild123', 'log_channel_id')).toBeNull();
+
+        // General non-channel key: falls back to global
         db.prepare.mockReturnValueOnce({
             get: vi.fn().mockReturnValue(undefined)
         }).mockReturnValueOnce({
-            get: vi.fn().mockReturnValue({ value: 'global_log' })
+            get: vi.fn().mockReturnValue({ value: 'global_val' })
         });
-        expect(SettingsManager.getGuild('guild123', 'log_channel_id')).toBe('global_log');
+        expect(SettingsManager.getGuild('guild123', 'custom_prefix')).toBe('global_val');
     });
 
     it('setGuild should store into guild_settings table', () => {

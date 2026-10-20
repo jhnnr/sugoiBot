@@ -6,7 +6,7 @@ Dynamic Join-to-Create temporary voice rooms with in-chat interactive controls, 
 
 | Key | Description | Type | Default |
 | :--- | :--- | :--- | :--- |
-| `voice_enabled` | Enable temporary voice channel system | `boolean` | `true` |
+| `voice_enabled` | Enable temporary voice channel system in this server | `boolean` | `true` |
 | `voice_default_limit` | Default user limit for created rooms (0 for unlimited) | `number` | `0` |
 | `voice_naming_scheme` | Template for naming temporary voice channels | `string` | `{username}'s Room` |
 

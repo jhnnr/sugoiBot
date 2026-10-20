@@ -41,6 +41,7 @@ const DEFAULT_GLOBAL_SETTINGS = {
 
 export const DEFAULT_GUILD_SETTINGS = {
     log_channel_id: '',
+    xp_channel_id: '',
     log_events_member_join: true,
     log_events_member_leave: true,
     log_events_member_update: true,
@@ -341,6 +342,83 @@ app.post('/api/guilds/:guildId/settings', (req, res) => {
 
     const updated = { ...DEFAULT_GUILD_SETTINGS, ...SettingsManager.getAllGuild(guildId) };
     res.json({ success: true, guildId, settings: updated });
+});
+
+app.get('/api/modules', async (req, res) => {
+    try {
+        const modulesDir = path.resolve(__dirname, '..', 'modules');
+        const entries = fs.readdirSync(modulesDir).filter(f => fs.statSync(path.join(modulesDir, f)).isDirectory());
+        const list = [];
+        for (const folder of entries) {
+            const indexPath = path.join(modulesDir, folder, 'index.js');
+            if (fs.existsSync(indexPath)) {
+                try {
+                    const mod = (await import(pathToFileURL(indexPath).href)).default;
+                    if (mod) {
+                        list.push({
+                            id: folder.toLowerCase(),
+                            name: mod.name || folder,
+                            description: mod.description || '',
+                            settings: (mod.settings || []).map(s => ({
+                                key: s.key,
+                                description: s.description,
+                                type: s.type,
+                                defaultValue: s.defaultValue,
+                                min: s.min,
+                                max: s.max
+                            }))
+                        });
+                    }
+                } catch (err) {}
+            }
+        }
+        res.json({ modules: list });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to discover modules' });
+    }
+});
+
+app.get('/api/guilds/:guildId/channels', async (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId } = req.params;
+    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    if (!process.env.DISCORD_TOKEN) {
+        return res.json({ channels: [] });
+    }
+
+    try {
+        const discordRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+            headers: {
+                Authorization: `Bot ${process.env.DISCORD_TOKEN}`
+            }
+        });
+
+        if (discordRes.ok) {
+            const data = await discordRes.json();
+            const textChannels = data
+                .filter(c => c.type === 0 || c.type === 5)
+                .sort((a, b) => a.position - b.position)
+                .map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    type: c.type,
+                    parentId: c.parent_id
+                }));
+            return res.json({ channels: textChannels });
+        } else {
+            return res.json({ channels: [] });
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch guild channels' });
+    }
 });
 
 /* =========================================================

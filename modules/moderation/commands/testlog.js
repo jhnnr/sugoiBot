@@ -11,10 +11,10 @@ export default {
             return interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
         }
 
-        const rawChannelId = SettingsManager.getGuild(interaction.guild.id, 'log_channel_id') || SettingsManager.get('log_channel_id');
+        const rawChannelId = SettingsManager.getGuild(interaction.guild.id, 'log_channel_id');
         if (!rawChannelId) {
             return interaction.reply({
-                content: '⚠️ No log channel configured for this server. Please set a **Log Channel ID** in the dashboard first.',
+                content: '⚠️ No log channel configured for this server. Please set a **Log Channel ID** in the dashboard or run `/setlog`.',
                 ephemeral: true
             });
         }

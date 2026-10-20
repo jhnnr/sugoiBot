@@ -6,10 +6,11 @@ Engagement and leveling system.
 
 | Key | Description | Type | Default |
 | :--- | :--- | :--- | :--- |
-| `xp_enabled` | Enable XP system | `boolean` | `true` |
-| `xp_min` | Min XP per message | `number` | `10` |
-| `xp_max` | Max XP per message | `number` | `20` |
+| `xp_enabled` | Enable XP system in this server | `boolean` | `true` |
+| `xp_min` | Min XP awarded per message | `number` | `10` |
+| `xp_max` | Max XP awarded per message | `number` | `20` |
 | `xp_voice_per_minute` | XP awarded per minute in voice channels | `number` | `5` |
+| `xp_channel_id` | Channel for Level Up announcements | `channel` | `` |
 | `role_rewards` | Map of level to role ID rewards (JSON) | `object` | `{}` |
 
 ## ⌨️ Slash Commands

@@ -104,10 +104,17 @@ export default {
                     const result = await member.addXP(xpToAdd);
 
                     if (result.leveledUp) {
-                        try {
-                            await memberObj.send(`Congrats! You leveled up to **${result.level}** by hanging out in voice!`);
-                        } catch (e) {
-                            // Could not DM user
+                        const rawChannel = SettingsManager.getGuild(memberObj.guild.id, 'xp_channel_id');
+                        const targetChannelId = rawChannel ? String(rawChannel).replace(/^["']|["']$/g, '').trim() : '';
+                        const targetChannel = targetChannelId ? (memberObj.guild.channels.cache.get(targetChannelId) || await memberObj.guild.channels.fetch(targetChannelId).catch(() => null)) : null;
+
+                        const congratsText = `Congrats ${memberObj}! You leveled up to **${result.level}** by hanging out in voice!`;
+                        if (targetChannel && typeof targetChannel.send === 'function') {
+                            await targetChannel.send(congratsText).catch(() => {});
+                        } else {
+                            try {
+                                await memberObj.send(congratsText);
+                            } catch (e) {}
                         }
                     }
                 }
@@ -130,10 +137,17 @@ export default {
                     const result = await member.addXP(xpToAdd);
 
                     if (result.leveledUp) {
-                        try {
-                            await memberObj.send(`Congrats! You leveled up to **${result.level}** by hanging out in voice!`);
-                        } catch (e) {
-                            // Could not DM user
+                        const rawChannel = SettingsManager.getGuild(memberObj.guild.id, 'xp_channel_id');
+                        const targetChannelId = rawChannel ? String(rawChannel).replace(/^["']|["']$/g, '').trim() : '';
+                        const targetChannel = targetChannelId ? (memberObj.guild.channels.cache.get(targetChannelId) || await memberObj.guild.channels.fetch(targetChannelId).catch(() => null)) : null;
+
+                        const congratsText = `Congrats ${memberObj}! You leveled up to **${result.level}** by hanging out in voice!`;
+                        if (targetChannel && typeof targetChannel.send === 'function') {
+                            await targetChannel.send(congratsText).catch(() => {});
+                        } else {
+                            try {
+                                await memberObj.send(congratsText);
+                            } catch (e) {}
                         }
                     }
                     // Reset join time to now for the new channel

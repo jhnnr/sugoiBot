@@ -157,7 +157,8 @@ Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Un
 ### Commands
 - Install dependencies: `npm install`
 - Run bot and dashboard: `npm start` (`node main.js` - starts both concurrently)
-- Run tests: `npm test` (`vitest run` - full test suite)
+- Run via Docker: `docker compose up -d`
+- Run tests: `npm test` (`vitest run` - full test suite of 90 tests)
 - Run dashboard standalone: `npm run dashboard` (`node dashboard/server.js`)
 - Deploy slash commands: `npm run deploy` (`node deploy-commands.js`)
 - Generate documentation: `npm run docs:generate` (`node scripts/generate-docs.js`)
@@ -176,6 +177,8 @@ Prefer single-file or single-test runs during iteration (e.g. `npx vitest run te
 - `dashboard/`:
   - `server.js`: Express server with Discord OAuth2 login, guild management API, per-guild settings management, and stats.
   - `public/`: Frontend (`index.html`) with login landing page, server selector, active module checkboxes, log checkboxes, XP/economy settings.
+- `docker-compose.yml`, `Dockerfile`, `entrypoint.sh`: Multi-arch containerization (`linux/amd64`, `linux/arm64`) with `gosu` privilege de-escalation for non-root `/app/data` volume permissions.
+- `.github/workflows/docker-publish.yml`: CI/CD workflow running Vitest and building/pushing multi-arch Docker images with dynamic `package.json` version tagging.
 - `docs/`: MkDocs documentation with automated module docs (`docs/modules/*.md`).
 - `tests/`: 15 Vitest test suites covering all modules, handlers, utilities, and endpoints.
 
@@ -209,6 +212,11 @@ Prefer single-file or single-test runs during iteration (e.g. `npx vitest run te
 - Keep audit log embeds clean: author header with user avatar/name, concise action description in body, and native `embed.setTimestamp()` in footer without footer text clutter.
 - Track voice hubs by `hubChannelId` as primary key (in `voice_hubs`) rather than `guildId` to allow multiple concurrent Join-to-Create hubs per server.
 - Store user custom voice room names in `voice_user_settings` keyed by `userId` to enable cross-server room name persistence.
+- In Docker environments mounting host directories to SQLite (`/app/data`), run an `entrypoint.sh` using `gosu` to guarantee directory write permissions (`chmod 777` / `chown node:node`) before executing as `node`, preventing `SQLITE_CANTOPEN` errors.
+- Resolve database directories via `process.env.DATA_DIR || path.resolve(__dirname, '..', 'data')` rather than relying on `process.cwd()`.
+- Never allow channel snowflake settings (`log_channel_id`, `xp_channel_id`, `*_channel_id`) to fall back to global settings in `SettingsManager.getGuild`; channel snowflakes are strictly unique to their guild.
+- When generating canvas graphics in Linux Docker containers with Skia / `@napi-rs/canvas`, install `fontconfig`, `fonts-dejavu-core`, and call `GlobalFonts.loadSystemFonts()` with a `"DejaVu Sans", sans-serif` font stack to prevent invisible text rendering.
+- Register module setting schemas dynamically on startup via `SettingsManager.registerSchema(mod.settings, moduleName)` for type-safe validation and access via `SettingsManager.getModuleSettings(guildId, moduleName)`.
 
 ---
 
@@ -224,5 +232,3 @@ This boilerplate synthesizes:
 
 Read once. Edit sections 10 and 11 for your project. Prune the rest over time. This file gets better the more you use it.
 
-
-gemini --resume '56494210-d80d-46e7-bcd9-063584d777e4'
