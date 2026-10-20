@@ -79,7 +79,8 @@ describe('GameRole Module', () => {
             const interaction = {
                 guild: mockGuild,
                 options: {
-                    getSubcommand: () => 'list'
+                    getSubcommand: () => 'list',
+                    getInteger: vi.fn().mockReturnValue(1)
                 },
                 reply
             };
@@ -91,7 +92,28 @@ describe('GameRole Module', () => {
             }));
         });
 
-        it('should remove a game from the whitelist', async () => {
+        it('should remove a custom game from the whitelist', async () => {
+            const mockRun = vi.fn().mockReturnValue({ changes: 1 });
+            db.prepare.mockReturnValue({ run: mockRun });
+
+            const reply = vi.fn();
+            const interaction = {
+                guild: mockGuild,
+                options: {
+                    getSubcommand: () => 'remove',
+                    getString: () => 'MyCustomGame'
+                },
+                reply
+            };
+
+            await gameroleCommand.execute(interaction);
+
+            expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('Removed **MyCustomGame**')
+            }));
+        });
+
+        it('should disable a default game for this server', async () => {
             const mockRun = vi.fn().mockReturnValue({ changes: 1 });
             db.prepare.mockReturnValue({ run: mockRun });
 
@@ -108,7 +130,7 @@ describe('GameRole Module', () => {
             await gameroleCommand.execute(interaction);
 
             expect(reply).toHaveBeenCalledWith(expect.objectContaining({
-                content: expect.stringContaining('Removed **Valorant**')
+                content: expect.stringContaining('Disabled **Valorant**')
             }));
         });
     });

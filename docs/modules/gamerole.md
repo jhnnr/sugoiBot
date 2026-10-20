@@ -20,7 +20,8 @@ Manage the GameRole game whitelist and presence role automation.
 
 - `add` (Optional): Add a game to the GameRole whitelist.
 - `addmygame` (Optional): Add the game you are currently playing to the whitelist.
-- `remove` (Optional): Remove a game from the GameRole whitelist.
+- `remove` (Optional): Remove or disable a game from the GameRole whitelist.
+- `reset` (Optional): Reset whitelist overrides back to the 84 default games.
 - `list` (Optional): List all whitelisted games for this server.
 - `info` (Optional): Display GameRole module information and status.
 

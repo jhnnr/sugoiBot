@@ -46,7 +46,7 @@ describe('Leaderboard Card Image Generator', () => {
     it('should render leaderboard when guild iconURL is present', async () => {
         const mockGuild = {
             name: 'Pro Guild',
-            iconURL: () => 'https://cdn.discordapp.com/icons/g1/test.png'
+            iconURL: () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
         };
         const buffer = await generateLeaderboardCard(mockGuild, [
             { rank: 1, user: { username: 'Ace' }, xp: 200, level: 2 }

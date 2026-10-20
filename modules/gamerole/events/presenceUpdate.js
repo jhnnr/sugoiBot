@@ -49,8 +49,21 @@ export default {
                 const switchedGame = newActivity && newActivity.name !== oldActivity.name;
 
                 if (stoppedPlaying || switchedGame) {
-                    const oldRoleName = rolePrefix + oldActivity.name;
-                    const roleToRemove = findRoleInGuild(oldRoleName);
+                    let oldRoleTarget = oldActivity.name;
+                    const oldCustom = db.prepare(
+                        'SELECT roleName FROM gamerole_whitelist WHERE guildId = ? AND LOWER(gameName) = LOWER(?)'
+                    ).get(guild.id, oldActivity.name);
+
+                    if (oldCustom && oldCustom.roleName && oldCustom.roleName !== '__DISABLED__') {
+                        oldRoleTarget = oldCustom.roleName;
+                    } else {
+                        const lowerOld = oldActivity.name.toLowerCase();
+                        const oldMatch = Object.entries(defaultWhitelist).find(([k]) => k.toLowerCase() === lowerOld);
+                        if (oldMatch) oldRoleTarget = oldMatch[1];
+                    }
+
+                    const oldRoleName = rolePrefix + oldRoleTarget;
+                    const roleToRemove = findRoleInGuild(oldRoleName) || findRoleInGuild(rolePrefix + oldActivity.name);
 
                     if (roleToRemove && member.roles?.cache?.has(roleToRemove.id)) {
                         await member.roles.remove(roleToRemove.id).catch(() => {});
@@ -68,6 +81,9 @@ export default {
                 ).get(guild.id, gameName);
 
                 if (customEntry) {
+                    if (customEntry.roleName === '__DISABLED__') {
+                        return; // Explicitly disabled for this guild
+                    }
                     resolvedRoleName = customEntry.roleName || gameName;
                 } else {
                     // Check default whitelist
