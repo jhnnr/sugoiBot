@@ -42,4 +42,16 @@ describe('Leaderboard Card Image Generator', () => {
         expect(buffer).toBeInstanceOf(Buffer);
         expect(buffer.length).toBeGreaterThan(1000);
     });
+
+    it('should render leaderboard when guild iconURL is present', async () => {
+        const mockGuild = {
+            name: 'Pro Guild',
+            iconURL: () => 'https://cdn.discordapp.com/icons/g1/test.png'
+        };
+        const buffer = await generateLeaderboardCard(mockGuild, [
+            { rank: 1, user: { username: 'Ace' }, xp: 200, level: 2 }
+        ]);
+        expect(buffer).toBeInstanceOf(Buffer);
+        expect(buffer.length).toBeGreaterThan(1000);
+    });
 });
