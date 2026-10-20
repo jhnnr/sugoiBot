@@ -117,6 +117,31 @@ sugoiBot/
 
 ---
 
+## 🐳 Docker Deployment
+
+### Using Docker Compose
+1. Ensure your `.env` file is configured in the project root.
+2. Launch the container:
+   ```bash
+   docker compose up -d
+   ```
+3. Persistent database data is mapped to `./data` on the host machine, and the dashboard is available at `http://localhost:3000`.
+
+### Building the Image Manually
+Build for your current architecture:
+```bash
+docker build -t sugoibot .
+docker run -d --name sugoibot --env-file .env -p 3000:3000 -v $(pwd)/data:/app/data sugoibot
+```
+
+### Multi-Architecture Builds
+Using Docker Buildx:
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 -t your-username/sugoibot:latest .
+```
+
+---
+
 ## 🧩 Adding a New Module
 
 To create a new module (e.g. `tickets`):
