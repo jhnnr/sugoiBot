@@ -12,6 +12,8 @@
 - [x] **Logging Service**: Implement a dedicated logging channel for bot events (guild join, command usage).
 - [x] **Member Classes**: Create a `Member` class in `lib/classes` to abstract database calls for user data.
 - [x] **Member Join & Invite Tracking**: Log new member joins with the inviter, invite code, and account age.
+- [ ] **GameRole Module Settings**: Add server settings for the GameRole module (customizable role prefix, role color, and whitelist toggle).
+- [ ] **Auto-Generated Module Settings Buttons**: If SettingsManager is used in a module, automatically render a settings button (`⚙️ Settings`) on the dashboard for that module.
 - [ ] **Role Rewards Management Command**: Add an in-Discord slash command (`/setreward`) to configure level role rewards.
 
 ## 🟢 Low Priority
