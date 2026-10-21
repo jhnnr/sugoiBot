@@ -1013,8 +1013,9 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-save-floating" onclick="closeModal('xpModal')">Done</button>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn-reset" onclick="closeModal('xpModal')">Done</button>
+                <button type="button" class="btn-save-floating" onclick="submitSettingsFromModal('xpModal')">Save Changes</button>
             </div>
         </div>
     </div>
@@ -1051,8 +1052,9 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-save-floating" onclick="closeModal('voiceModal')">Done</button>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn-reset" onclick="closeModal('voiceModal')">Done</button>
+                <button type="button" class="btn-save-floating" onclick="submitSettingsFromModal('voiceModal')">Save Changes</button>
             </div>
         </div>
     </div>
@@ -1082,8 +1084,10 @@
                     <span class="help-text">Hex color code applied to auto-generated game roles (e.g. <code>#ff0000</code>).</span>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-save-floating" onclick="closeModal('gameroleModal')">Done</button>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn-reset" onclick="closeModal('gameroleModal')">Done</button>
+                <button type="button" class="btn-save-floating" onclick="submitSettingsFromModal('gameroleModal')">Save Changes</button>
+            </div>
             </div>
         </div>
     </div>
@@ -1268,11 +1272,19 @@
             checkFormChanges();
         });
 
+        function getAllSettingsInputs() {
+            return document.querySelectorAll('#settingsForm input, #settingsForm select, [form="settingsForm"]');
+        }
+
+        function submitSettingsFromModal(modalId) {
+            closeModal(modalId);
+            document.getElementById('settingsForm').requestSubmit();
+        }
+
         // Unsaved Changes Tracking
         function captureFormState() {
             const state = {};
-            const form = document.getElementById('settingsForm');
-            const inputs = form.querySelectorAll('input, select');
+            const inputs = getAllSettingsInputs();
             inputs.forEach(el => {
                 const id = el.id || el.name;
                 if (!id) return;
@@ -1303,8 +1315,7 @@
         }
 
         function resetFormChanges() {
-            const form = document.getElementById('settingsForm');
-            const inputs = form.querySelectorAll('input, select');
+            const inputs = getAllSettingsInputs();
             inputs.forEach(el => {
                 const id = el.id || el.name;
                 if (!id || originalFormState[id] === undefined) return;
@@ -1324,8 +1335,16 @@
         }
 
         resetBtn.addEventListener('click', resetFormChanges);
-        document.getElementById('settingsForm').addEventListener('input', checkFormChanges);
-        document.getElementById('settingsForm').addEventListener('change', checkFormChanges);
+        document.addEventListener('input', (e) => {
+            if (e.target.closest('#settingsForm, [form="settingsForm"], .modal-box')) {
+                checkFormChanges();
+            }
+        });
+        document.addEventListener('change', (e) => {
+            if (e.target.closest('#settingsForm, [form="settingsForm"], .modal-box')) {
+                checkFormChanges();
+            }
+        });
 
         function loadStats() {
             fetch('/api/stats')
@@ -1508,6 +1527,45 @@
                 checkFormChanges();
             }
 
+            function syncValueFromInput() {
+                const query = searchInput.value.trim();
+                if (!query) {
+                    hiddenInput.value = '';
+                    checkFormChanges();
+                    return;
+                }
+
+                // If user typed 17-20 digit snowflake ID
+                if (/^\d{17,20}$/.test(query)) {
+                    hiddenInput.value = query;
+                    checkFormChanges();
+                    return;
+                }
+
+                // Check exact match (ignoring leading '#')
+                const clean = query.replace(/^#/, '').toLowerCase();
+                const exact = allChannels.find(c => c.name.toLowerCase() === clean || c.id === query);
+                if (exact) {
+                    selectItem(exact.id, '#' + exact.name);
+                    return;
+                }
+
+                // If only 1 filtered channel matches
+                const filtered = allChannels.filter(c => c.name.toLowerCase().includes(clean));
+                if (filtered.length === 1) {
+                    selectItem(filtered[0].id, '#' + filtered[0].name);
+                    return;
+                }
+
+                // Revert to existing selected value display
+                if (hiddenInput.value) {
+                    const match = allChannels.find(c => c.id === hiddenInput.value);
+                    searchInput.value = match ? '#' + match.name : (hiddenInput.value ? `Channel ID: ${hiddenInput.value}` : '');
+                } else {
+                    searchInput.value = '';
+                }
+            }
+
             searchInput.addEventListener('focus', () => {
                 const query = searchInput.value.startsWith('#') ? '' : searchInput.value;
                 render(query);
@@ -1527,15 +1585,18 @@
                 checkFormChanges();
             });
 
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    syncValueFromInput();
+                    dropdown.classList.remove('open');
+                }
+            });
+
             document.addEventListener('click', (e) => {
                 if (!e.target.closest('#' + wrapperId)) {
                     dropdown.classList.remove('open');
-                    if (hiddenInput.value) {
-                        const match = allChannels.find(c => c.id === hiddenInput.value);
-                        searchInput.value = match ? '#' + match.name : (hiddenInput.value ? `Channel ID: ${hiddenInput.value}` : '');
-                    } else {
-                        searchInput.value = '';
-                    }
+                    syncValueFromInput();
                 }
             });
 
