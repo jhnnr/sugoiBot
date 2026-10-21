@@ -977,10 +977,15 @@
 
                 <!-- Level Role Rewards Section -->
                 <div style="border-top: 1px solid var(--border); padding-top: 1.25rem;">
-                    <h4 style="color: var(--text-heading); font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
-                        Level Role Rewards
-                    </h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h4 style="color: var(--text-heading); font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; margin: 0;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+                            Level Role Rewards
+                        </h4>
+                        <button type="button" class="btn-icon" style="width: 26px; height: 26px;" onclick="refreshXPModalData(currentGuildId)" title="Refresh Roles & Rewards">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                        </button>
+                    </div>
                     <div class="checkbox-row" style="margin-bottom: 1rem;">
                         <input type="checkbox" id="role_rewards_enabled" name="role_rewards_enabled" form="settingsForm">
                         <label for="role_rewards_enabled">
@@ -1044,8 +1049,13 @@
 
                 <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <h4 style="color: var(--text-heading); font-size: 0.95rem;">Configured Hubs (Join to Create)</h4>
-                        <span class="badge" id="voiceHubsCount">0 Hubs</span>
+                        <h4 style="color: var(--text-heading); font-size: 0.95rem; margin: 0;">Configured Hubs (Join to Create)</h4>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="badge" id="voiceHubsCount">0 Hubs</span>
+                            <button type="button" class="btn-icon" style="width: 26px; height: 26px;" onclick="loadVoiceStatus(currentGuildId)" title="Refresh Hubs">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            </button>
+                        </div>
                     </div>
                     <div id="voiceHubsList" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.4rem;">
                         <span style="color: var(--text-muted);">Loading hubs...</span>
@@ -1153,9 +1163,80 @@
         }
 
         // Modal Controls
-        function openModal(modalId) {
+        async function openModal(modalId) {
             const modal = document.getElementById(modalId);
-            if (modal) modal.style.display = 'flex';
+            if (!modal) return;
+            modal.style.display = 'flex';
+
+            if (!currentGuildId) return;
+
+            if (modalId === 'voiceModal') {
+                await loadVoiceStatus(currentGuildId);
+            } else if (modalId === 'xpModal') {
+                await refreshXPModalData(currentGuildId);
+            } else if (modalId === 'gameroleModal') {
+                await refreshGameRoleModalData(currentGuildId);
+            }
+        }
+
+        async function refreshXPModalData(guildId) {
+            if (!guildId) return;
+            try {
+                const [rolesRes, channelsRes, settingsRes] = await Promise.all([
+                    fetch(`/api/guilds/${guildId}/roles`),
+                    fetch(`/api/guilds/${guildId}/channels`),
+                    fetch(`/api/guilds/${guildId}/settings`)
+                ]);
+
+                if (rolesRes.ok) {
+                    const rData = await rolesRes.json();
+                    guildRolesCache = rData.roles || [];
+                    const roleSelect = document.getElementById('new_reward_role_select');
+                    const currentSelectedRole = roleSelect.value;
+                    roleSelect.innerHTML = '<option value="">Select a role...</option>' + 
+                        guildRolesCache.map(r => `<option value="${r.id}">@${r.name}</option>`).join('');
+                    if (currentSelectedRole) roleSelect.value = currentSelectedRole;
+                }
+
+                if (channelsRes.ok) {
+                    const cData = await channelsRes.json();
+                    const channels = cData.channels || [];
+                    const currentSelectedXpCh = document.getElementById('xp_channel_id').value;
+                    xpChannelCombobox.setChannels(channels, currentSelectedXpCh);
+                }
+
+                if (settingsRes.ok) {
+                    const sData = await settingsRes.json();
+                    const s = sData.settings || {};
+                    // If no unsaved edits to role_rewards, sync latest
+                    if (!originalFormState['role_rewards'] || originalFormState['role_rewards'] === JSON.stringify(currentRoleRewards)) {
+                        currentRoleRewards = s.role_rewards || {};
+                        originalFormState['role_rewards'] = JSON.stringify(currentRoleRewards);
+                    }
+                }
+
+                renderRoleRewardsList();
+            } catch (err) {
+                console.warn('Failed to refresh XP modal data:', err);
+            }
+        }
+
+        async function refreshGameRoleModalData(guildId) {
+            if (!guildId) return;
+            try {
+                const res = await fetch(`/api/guilds/${guildId}/settings`);
+                if (res.ok) {
+                    const sData = await res.json();
+                    const s = sData.settings || {};
+                    if (!floatingSaveBar.classList.contains('visible')) {
+                        document.getElementById('gamerole_prefix').value = s.gamerole_prefix || 'PLAYING ';
+                        document.getElementById('gamerole_color').value = s.gamerole_color || '#ff0000';
+                        document.getElementById('gamerole_color_picker').value = (s.gamerole_color && /^#[0-9a-fA-F]{6}$/.test(s.gamerole_color)) ? s.gamerole_color : '#ff0000';
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to refresh GameRole modal data:', err);
+            }
         }
 
         function closeModal(modalId) {
