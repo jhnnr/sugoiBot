@@ -45,6 +45,14 @@ describe('Member', () => {
         expect(member.getXP()).toEqual({ xp: 10, level: 2 });
     });
 
+    it('getRank should return user rank within guild', () => {
+        db.prepare.mockReturnValue({
+            all: vi.fn().mockReturnValue([{ userId: 'other' }, { userId: '123' }])
+        });
+
+        expect(member.getRank()).toBe(2);
+    });
+
     it('getBalance should return 0 if no row found', () => {
         db.prepare.mockReturnValue({
             get: vi.fn().mockReturnValue(undefined)

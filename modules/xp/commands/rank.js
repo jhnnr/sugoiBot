@@ -13,6 +13,7 @@ export default {
 
         const member = new Member(targetMember);
         const data = member.getXP();
+        data.rank = member.getRank();
 
         const getNeededXP = (lvl) => lvl * lvl * 100;
         const neededXP = getNeededXP(data.level);

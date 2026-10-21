@@ -13,7 +13,7 @@ export default {
                 .setMaxValue(10)),
     async execute(interaction) {
         const limit = interaction.options.getInteger('limit') ?? 10;
-        const rows = db.prepare('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT ?').all(limit);
+        const rows = db.prepare('SELECT userId, xp, level FROM xp WHERE guildId = ? ORDER BY level DESC, xp DESC LIMIT ?').all(interaction.guild.id, limit);
 
         if (!rows || rows.length === 0) {
             return interaction.reply({ content: 'No users have earned XP yet!', ephemeral: true });

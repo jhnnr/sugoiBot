@@ -176,6 +176,33 @@ describe('XP Module', () => {
             );
             logSpy.mockRestore();
         });
+
+        it('should award voice XP on disconnect when user was in voice', async () => {
+            const { voiceCollection } = await import('../modules/xp/events/voiceStateUpdate.js');
+            const mockRun = vi.fn();
+            db.prepare.mockReturnValue({
+                get: vi.fn().mockReturnValue({ xp: 10, level: 1 }),
+                run: mockRun
+            });
+
+            // Simulate session in voiceCollection for 2 minutes
+            const sessionKey = `${mockGuild.id}_${mockMember.id}`;
+            voiceCollection.set(sessionKey, {
+                guildId: mockGuild.id,
+                userId: mockMember.id,
+                channelId: 'vc1',
+                joinedAt: Date.now() - 120000,
+                lastAwardedAt: Date.now() - 120000
+            });
+
+            const oldState = { channelId: 'vc1', channel: { name: 'Room 1' }, member: mockMember, deaf: false, selfDeaf: false };
+            const newState = { channelId: null, member: mockMember };
+
+            await voiceStateUpdateEvent.execute(oldState, newState);
+
+            expect(mockRun).toHaveBeenCalled();
+            expect(voiceCollection.has(sessionKey)).toBe(false);
+        });
     });
 
     describe('/setreward', () => {
