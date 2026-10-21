@@ -166,8 +166,9 @@ describe('Core Module Events', () => {
             expect(loggingService.log).toHaveBeenCalledWith(
                 mockGuild,
                 expect.objectContaining({
-                    title: 'Avatar Changed',
-                    eventType: 'log_events_member_update'
+                    eventType: 'log_events_member_update',
+                    description: '<@u400> updated their profile!',
+                    footerText: 'User ID: u400'
                 })
             );
         });
@@ -206,8 +207,9 @@ describe('Core Module Events', () => {
             expect(loggingService.log).toHaveBeenCalledWith(
                 mockGuild,
                 expect.objectContaining({
-                    title: 'Server Avatar Changed',
-                    eventType: 'log_events_member_update'
+                    eventType: 'log_events_member_update',
+                    description: '<@u400> updated their server profile!',
+                    footerText: 'User ID: u400'
                 })
             );
         });

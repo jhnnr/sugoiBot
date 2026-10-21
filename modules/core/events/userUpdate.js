@@ -1,6 +1,5 @@
-import { Events, EmbedBuilder } from 'discord.js';
+import { Events } from 'discord.js';
 import { loggingService } from '../../../lib/bot/loggingService.js';
-import { SettingsManager } from '../../../lib/settings.js';
 
 export default {
     name: Events.UserUpdate,
@@ -11,7 +10,6 @@ export default {
         const oldAvatarUrl = oldUser.displayAvatarURL({ size: 256 });
         const newAvatarUrl = newUser.displayAvatarURL({ size: 256 });
 
-        // Iterate through all mutual guilds the client is in
         const client = newUser.client;
         if (!client.guilds?.cache) return;
 
@@ -22,16 +20,15 @@ export default {
                 if (!member) continue;
 
                 await loggingService.log(guild, {
-                    title: 'Avatar Changed',
-                    description: `**${newUser.tag}** (<@${newUser.id}>) updated their profile picture.\n\n` +
-                        `• [Previous Avatar](${oldAvatarUrl})\n` +
-                        `• [New Avatar](${newAvatarUrl})`,
+                    description: `<@${newUser.id}> updated their profile!`,
                     color: 0x5865F2,
-                    thumbnail: oldAvatarUrl,
-                    image: newAvatarUrl,
+                    thumbnail: newAvatarUrl,
                     eventType: 'log_events_member_update',
                     user: newUser,
-                    fields: [{ name: 'User ID', value: newUser.id }]
+                    fields: [
+                        { name: 'Avatar', value: `[before](${oldAvatarUrl}) -> [after](${newAvatarUrl})` }
+                    ],
+                    footerText: `User ID: ${newUser.id}`
                 });
             } catch (err) {
                 // Ignore guild fetch errors

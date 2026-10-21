@@ -1,6 +1,5 @@
-import { Events, EmbedBuilder } from 'discord.js';
+import { Events } from 'discord.js';
 import { loggingService } from '../../../lib/bot/loggingService.js';
-import { SettingsManager } from '../../../lib/settings.js';
 
 export default {
     name: Events.GuildMemberUpdate,
@@ -14,16 +13,15 @@ export default {
             const newAvatarUrl = newMember.displayAvatarURL({ size: 256 });
 
             await loggingService.log(guild, {
-                title: 'Server Avatar Changed',
-                description: `**${newMember.user.tag}** (<@${newMember.id}>) updated their server profile picture in **${guild.name}**.\n\n` +
-                    `• [Previous Avatar](${oldAvatarUrl})\n` +
-                    `• [New Avatar](${newAvatarUrl})`,
+                description: `<@${newMember.id}> updated their server profile!`,
                 color: 0x5865F2,
-                thumbnail: oldAvatarUrl,
-                image: newAvatarUrl,
+                thumbnail: newAvatarUrl,
                 eventType: 'log_events_member_update',
                 user: newMember.user,
-                fields: [{ name: 'User ID', value: newMember.id }]
+                fields: [
+                    { name: 'Avatar', value: `[before](${oldAvatarUrl}) -> [after](${newAvatarUrl})` }
+                ],
+                footerText: `User ID: ${newMember.id}`
             });
         }
     },
