@@ -219,6 +219,9 @@ Prefer single-file or single-test runs during iteration (e.g. `npx vitest run te
 - Register module setting schemas dynamically on startup via `SettingsManager.registerSchema(mod.settings, moduleName)` for type-safe validation and access via `SettingsManager.getModuleSettings(guildId, moduleName)`.
 - For GameRole automated role assignment to function, enable the privileged Presence Intent in the Discord Developer Portal, grant the Manage Roles permission, and ensure the bot's role is positioned above member roles in the server role hierarchy.
 - Strictly do not use emojis in the UI of the web dashboard; use clean, minimalist SVGs instead. In the dashboard module list, render a gear icon SVG button without the word "Settings".
+- In dashboard OAuth authentication, ensure session.guilds is strictly validated and sanitized as an Array to prevent TypeError crashes when Discord returns non-array error payloads.
+- In dashboard forms with modals, query inputs using `[form="settingsForm"]` to capture inputs located outside the `<form>` DOM container.
+- In dashboard change detection, exclude search/helper inputs from `captureFormState()` and suppress change detection with an `isSwitchingGuild` guard during server switching transitions to prevent false-positive save bar displays.
 
 ---
 
