@@ -68,6 +68,7 @@ export const DEFAULT_GUILD_SETTINGS = {
     xp_min: 10,
     xp_max: 20,
     xp_voice_per_minute: 5,
+    role_rewards_enabled: true,
     role_rewards: {}
 };
 
@@ -83,7 +84,14 @@ export function getSession(req) {
         sessions.delete(sessionId);
         return null;
     }
+    if (!Array.isArray(session.guilds)) {
+        session.guilds = [];
+    }
     return session;
+}
+
+export function getUserGuilds(session) {
+    return Array.isArray(session?.guilds) ? session.guilds : [];
 }
 
 /**
@@ -195,16 +203,37 @@ app.get('/auth/discord/callback', async (req, res) => {
         const accessToken = tokenData.access_token;
 
         // Fetch user profile
-        const userRes = await fetch('https://discord.com/api/users/@me', {
-            headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        const user = await userRes.json();
+        let user = null;
+        try {
+            const userRes = await fetch('https://discord.com/api/users/@me', {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+            if (userRes.ok) {
+                user = await userRes.json();
+            } else {
+                const err = await userRes.text();
+                console.error('[AUTH ERROR] Failed to fetch @me user:', err);
+            }
+        } catch (e) {
+            console.error('[AUTH ERROR] Network error fetching @me user:', e);
+        }
 
         // Fetch user guilds
-        const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
-            headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        const guilds = await guildsRes.json();
+        let guilds = [];
+        try {
+            const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+            if (guildsRes.ok) {
+                const data = await guildsRes.json();
+                guilds = Array.isArray(data) ? data : [];
+            } else {
+                const err = await guildsRes.text();
+                console.error('[AUTH ERROR] Failed to fetch user guilds from Discord:', err);
+            }
+        } catch (e) {
+            console.error('[AUTH ERROR] Network error fetching user guilds:', e);
+        }
 
         // Store session
         const sessionId = crypto.randomUUID();
@@ -252,7 +281,7 @@ app.post('/api/auth/logout', (req, res) => {
 app.post('/api/auth/dev-login', (req, res) => {
     const { user, guilds } = req.body;
     const testUser = user || { id: 'test_user_1', username: 'TestAdmin', discriminator: '0001', avatar: null };
-    const testGuilds = guilds || [];
+    const testGuilds = Array.isArray(guilds) ? guilds : [];
 
     const sessionId = crypto.randomUUID();
     sessions.set(sessionId, {
@@ -281,10 +310,10 @@ app.get('/api/guilds', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
     }
 
-    const userGuilds = session.guilds || [];
+    const userGuilds = getUserGuilds(session);
     const manageable = userGuilds.filter(canManageGuild);
     const botGuilds = await getBotGuilds();
-    const botGuildIdSet = new Set(botGuilds.map(g => g.id));
+    const botGuildIdSet = new Set((botGuilds || []).map(g => g.id));
     const clientId = process.env.CLIENT_ID || '';
 
     const results = manageable.map(g => ({
@@ -307,7 +336,7 @@ app.get('/api/guilds/:guildId/settings', (req, res) => {
     }
 
     const { guildId } = req.params;
-    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
     if (!targetGuild || !canManageGuild(targetGuild)) {
         return res.status(403).json({ error: 'You do not have permission to manage this server.' });
     }
@@ -323,7 +352,7 @@ app.post('/api/guilds/:guildId/settings', (req, res) => {
     }
 
     const { guildId } = req.params;
-    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
     if (!targetGuild || !canManageGuild(targetGuild)) {
         return res.status(403).json({ error: 'You do not have permission to manage this server.' });
     }
@@ -390,7 +419,7 @@ app.get('/api/guilds/:guildId/channels', async (req, res) => {
     }
 
     const { guildId } = req.params;
-    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
     if (!targetGuild || !canManageGuild(targetGuild)) {
         return res.status(403).json({ error: 'You do not have permission to manage this server.' });
     }
@@ -433,7 +462,7 @@ app.get('/api/guilds/:guildId/voice', async (req, res) => {
     }
 
     const { guildId } = req.params;
-    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
     if (!targetGuild || !canManageGuild(targetGuild)) {
         return res.status(403).json({ error: 'You do not have permission to manage this server.' });
     }
@@ -460,12 +489,26 @@ app.get('/api/guilds/:guildId/voice', async (req, res) => {
 
         const enrichedHubs = (hubs || []).map(h => {
             const ch = channelMap.get(h.hubChannelId);
-            const cat = channelMap.get(h.categoryId);
+            let cat = h.categoryId ? channelMap.get(h.categoryId) : null;
+            if (!cat && ch?.parent_id) {
+                cat = channelMap.get(ch.parent_id);
+            }
+
+            let catDisplayName = 'No Category';
+            if (cat?.name) {
+                catDisplayName = cat.name;
+            } else if (h.categoryId && discordChannels.length > 0 && !channelMap.has(h.categoryId)) {
+                catDisplayName = 'Deleted Category';
+            } else if (h.categoryId) {
+                catDisplayName = h.categoryId;
+            }
+
             return {
                 hubChannelId: h.hubChannelId,
-                categoryId: h.categoryId,
+                categoryId: h.categoryId || (ch?.parent_id || null),
                 name: ch ? ch.name : (h.hubChannelId ? `Hub (${h.hubChannelId})` : 'Join to Create'),
-                categoryName: cat ? cat.name : (h.categoryId ? `Category (${h.categoryId})` : 'None')
+                categoryName: catDisplayName,
+                existsInDiscord: Boolean(ch)
             };
         });
 
@@ -486,6 +529,95 @@ app.get('/api/guilds/:guildId/voice', async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: 'Failed to retrieve voice status' });
+    }
+});
+
+app.delete('/api/guilds/:guildId/voice/hubs/:hubChannelId', async (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId, hubChannelId } = req.params;
+    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    try {
+        let hub = db.prepare('SELECT * FROM voice_hubs WHERE guildId = ? AND hubChannelId = ?').get(guildId, hubChannelId);
+        if (!hub) {
+            hub = db.prepare('SELECT * FROM voice_guilds WHERE guildId = ? AND hubChannelId = ?').get(guildId, hubChannelId);
+        }
+
+        const categoryId = hub?.categoryId;
+
+        // Delete from database
+        db.prepare('DELETE FROM voice_hubs WHERE guildId = ? AND hubChannelId = ?').run(guildId, hubChannelId);
+        db.prepare('DELETE FROM voice_guilds WHERE guildId = ? AND hubChannelId = ?').run(guildId, hubChannelId);
+        db.prepare('DELETE FROM voicemaster_guilds WHERE guildId = ? AND hubChannelId = ?').run(guildId, hubChannelId);
+
+        // Delete from Discord if token is available
+        if (process.env.DISCORD_TOKEN) {
+            await fetch(`https://discord.com/api/v10/channels/${hubChannelId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }
+            }).catch(() => {});
+
+            if (categoryId) {
+                await fetch(`https://discord.com/api/v10/channels/${categoryId}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }
+                }).catch(() => {});
+            }
+        }
+
+        res.json({ success: true, deletedHubId: hubChannelId });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete voice hub' });
+    }
+});
+
+app.get('/api/guilds/:guildId/roles', async (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId } = req.params;
+    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    if (!process.env.DISCORD_TOKEN) {
+        return res.json({ roles: [] });
+    }
+
+    try {
+        const discordRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
+            headers: {
+                Authorization: `Bot ${process.env.DISCORD_TOKEN}`
+            }
+        });
+
+        if (discordRes.ok) {
+            const data = await discordRes.json();
+            const roles = data
+                .filter(r => r.id !== guildId && !r.managed)
+                .sort((a, b) => b.position - a.position)
+                .map(r => ({
+                    id: r.id,
+                    name: r.name,
+                    color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,
+                    position: r.position
+                }));
+            return res.json({ roles });
+        } else {
+            return res.json({ roles: [] });
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch guild roles' });
     }
 });
 

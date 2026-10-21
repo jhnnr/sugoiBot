@@ -21,16 +21,20 @@ export default {
         const result = await member.addXP(xpToAdd);
 
         if (result.leveledUp) {
-            // Check role reward for this level
-            const rewards = SettingsManager.getGuildJson(message.guild.id, 'role_rewards', {});
-            const rewardRoleId = rewards[String(result.level)];
+            // Check role reward for this level if enabled
+            const roleRewardsEnabled = SettingsManager.getGuildJson(message.guild.id, 'role_rewards_enabled', true);
             let roleEarnedText = '';
 
-            if (rewardRoleId && message.member?.roles) {
-                const rewardRole = message.guild.roles.cache.get(rewardRoleId) || await message.guild.roles.fetch(rewardRoleId).catch(() => null);
-                if (rewardRole && !message.member.roles.cache.has(rewardRole.id)) {
-                    await message.member.roles.add(rewardRole.id).catch(() => {});
-                    roleEarnedText = ` You unlocked the **${rewardRole.name}** role!`;
+            if (roleRewardsEnabled) {
+                const rewards = SettingsManager.getGuildJson(message.guild.id, 'role_rewards', {});
+                const rewardRoleId = rewards[String(result.level)];
+
+                if (rewardRoleId && message.member?.roles) {
+                    const rewardRole = message.guild.roles.cache.get(rewardRoleId) || await message.guild.roles.fetch(rewardRoleId).catch(() => null);
+                    if (rewardRole && !message.member.roles.cache.has(rewardRole.id)) {
+                        await message.member.roles.add(rewardRole.id).catch(() => {});
+                        roleEarnedText = ` You unlocked the **${rewardRole.name}** role!`;
+                    }
                 }
             }
 

@@ -189,6 +189,23 @@ describe('Dashboard API', () => {
             expect(channelsRes.status).toBe(200);
             const channelsData = await channelsRes.json();
             expect(channelsData).toHaveProperty('channels');
+
+            // Test GET /api/guilds/:guildId/roles
+            const rolesRes = await fetch(`${baseUrl}/api/guilds/${testGuildId}/roles`, {
+                headers: { Cookie: cookieHeader }
+            });
+            expect(rolesRes.status).toBe(200);
+            const rolesData = await rolesRes.json();
+            expect(rolesData).toHaveProperty('roles');
+
+            // Test DELETE /api/guilds/:guildId/voice/hubs/:hubChannelId
+            const delHubRes = await fetch(`${baseUrl}/api/guilds/${testGuildId}/voice/hubs/testHub999`, {
+                method: 'DELETE',
+                headers: { Cookie: cookieHeader }
+            });
+            expect(delHubRes.status).toBe(200);
+            const delHubData = await delHubRes.json();
+            expect(delHubData.success).toBe(true);
         });
 
         it('GET /api/modules discovers all modules and their metadata', async () => {

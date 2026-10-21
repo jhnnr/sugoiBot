@@ -339,25 +339,39 @@
             color: var(--text-muted);
             margin-top: 0.15rem;
         }
-        .btn-module-settings {
+        .btn-icon {
             background-color: transparent;
             border: 1px solid var(--border);
             color: var(--text-normal);
-            padding: 0.4rem 0.8rem;
+            width: 34px;
+            height: 34px;
             border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            justify-content: center;
             flex-shrink: 0;
+            padding: 0;
         }
-        .btn-module-settings:hover {
+        .btn-icon:hover {
             border-color: var(--accent);
             color: var(--text-heading);
-            background-color: rgba(88, 101, 242, 0.1);
+            background-color: rgba(88, 101, 242, 0.15);
+        }
+        .btn-danger {
+            background-color: var(--danger);
+            color: #ffffff;
+            border: none;
+            padding: 0.5rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-danger:hover {
+            background-color: #d83a3e;
         }
         label {
             font-weight: 600;
@@ -581,9 +595,10 @@
         .combobox-arrow {
             position: absolute;
             right: 0.85rem;
-            font-size: 0.75rem;
             color: var(--text-muted);
             pointer-events: none;
+            display: flex;
+            align-items: center;
         }
         .combobox-dropdown {
             position: absolute;
@@ -612,7 +627,7 @@
             align-items: center;
             transition: background-color 0.15s, color 0.15s;
         }
-        .combobox-item:hover {
+        .combobox-item:hover, .combobox-item.highlighted {
             background-color: rgba(88, 101, 242, 0.15);
             color: var(--text-heading);
         }
@@ -666,28 +681,46 @@
 
             <div class="features-grid">
                 <div class="feature-box">
-                    <h3>📨 Invite Tracking</h3>
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        Invite Tracking
+                    </h3>
                     <p>Detect which invite was used by new members, showing inviter and code.</p>
                 </div>
                 <div class="feature-box">
-                    <h3>🖼️ Avatar Auditing</h3>
-                    <p>Track member profile picture updates with side-by-side before & after embeds.</p>
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+                        Avatar Auditing
+                    </h3>
+                    <p>Track member profile picture updates with side-by-side before & after links.</p>
                 </div>
                 <div class="feature-box">
-                    <h3>🔊 Temporary Voice</h3>
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                        Temporary Voice
+                    </h3>
                     <p>Dynamic Join-to-Create private voice rooms with in-chat controls for locking, renaming, and limits.</p>
                 </div>
                 <div class="feature-box">
-                    <h3>🎮 Game Roles</h3>
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="6"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/></svg>
+                        Game Roles
+                    </h3>
                     <p>Automatically create and assign server roles based on what games members are playing.</p>
                 </div>
                 <div class="feature-box">
-                    <h3>⚙️ Granular Logging</h3>
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        Granular Logging
+                    </h3>
                     <p>Custom checkboxes to toggle specific logs: joins, leaves, deletions, moderation.</p>
                 </div>
                 <div class="feature-box">
-                    <h3>⭐ XP & Economy</h3>
-                    <p>Configure text and voice XP rewards and server economy settings.</p>
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+                        XP & Economy
+                    </h3>
+                    <p>Configure text and voice XP rewards, level role rewards, and server economy settings.</p>
                 </div>
             </div>
         </section>
@@ -759,19 +792,24 @@
                         </div>
                     </div>
 
-                    <!-- XP & Leveling Module (With Settings Button) -->
+                    <!-- XP & Leveling Module (With Gear Button) -->
                     <div class="module-row">
                         <div class="checkbox-row" style="flex: 1;">
                             <input type="checkbox" id="module_xp_enabled" name="module_xp_enabled">
                             <label for="module_xp_enabled">
                                 <div class="checkbox-label-title">XP & Leveling Module</div>
-                                <div class="checkbox-label-desc">Level progression, /rank, /leaderboard, and text & voice XP rewards.</div>
+                                <div class="checkbox-label-desc">Level progression, /rank, /leaderboard, role rewards, and text & voice XP rewards.</div>
                             </label>
                         </div>
-                        <button type="button" class="btn-module-settings" onclick="openModal('xpModal')">⚙️ Settings</button>
+                        <button type="button" class="btn-icon" aria-label="Settings" onclick="openModal('xpModal')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
                     </div>
 
-                    <!-- GameRole Module -->
+                    <!-- GameRole Module (With Gear Button) -->
                     <div class="module-row">
                         <div class="checkbox-row" style="flex: 1;">
                             <input type="checkbox" id="module_gamerole_enabled" name="module_gamerole_enabled">
@@ -780,10 +818,15 @@
                                 <div class="checkbox-label-desc">Automatically assigns and removes roles based on member playing status.</div>
                             </label>
                         </div>
-                        <button type="button" class="btn-module-settings" onclick="openModal('gameroleModal')">⚙️ Settings</button>
+                        <button type="button" class="btn-icon" aria-label="Settings" onclick="openModal('gameroleModal')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
                     </div>
 
-                    <!-- Temporary Voice Module (With Settings Button) -->
+                    <!-- Temporary Voice Module (With Gear Button) -->
                     <div class="module-row">
                         <div class="checkbox-row" style="flex: 1;">
                             <input type="checkbox" id="module_voice_enabled" name="module_voice_enabled">
@@ -792,7 +835,12 @@
                                 <div class="checkbox-label-desc">Dynamic Join-to-Create temporary voice rooms with in-chat control interface.</div>
                             </label>
                         </div>
-                        <button type="button" class="btn-module-settings" onclick="openModal('voiceModal')">⚙️ Settings</button>
+                        <button type="button" class="btn-icon" aria-label="Settings" onclick="openModal('voiceModal')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
@@ -804,9 +852,11 @@
                             <input type="text" 
                                    class="combobox-input" 
                                    id="log_channel_search" 
-                                   placeholder="Filter channels or enter ID..." 
+                                   placeholder="Filter channels (#name) or enter ID..." 
                                    autocomplete="off">
-                            <span class="combobox-arrow">▼</span>
+                            <span class="combobox-arrow">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                            </span>
                         </div>
                         <input type="hidden" id="log_channel_id" name="log_channel_id">
                         <div class="combobox-dropdown" id="log_channel_dropdown"></div>
@@ -882,9 +932,12 @@
 
     <!-- XP & Leveling Module Settings Modal -->
     <div class="modal-backdrop" id="xpModal">
-        <div class="modal-box">
+        <div class="modal-box" style="max-width: 560px;">
             <div class="modal-header">
-                <h3>⭐ XP & Leveling Settings</h3>
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5865F2" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    XP & Leveling Settings
+                </h3>
                 <button type="button" class="modal-close" onclick="closeModal('xpModal')">&times;</button>
             </div>
             <div class="modal-body">
@@ -912,12 +965,52 @@
                                    id="xp_channel_search" 
                                    placeholder="Filter channels or enter ID..." 
                                    autocomplete="off">
-                            <span class="combobox-arrow">▼</span>
+                            <span class="combobox-arrow">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                            </span>
                         </div>
                         <input type="hidden" id="xp_channel_id" name="xp_channel_id" form="settingsForm">
                         <div class="combobox-dropdown" id="xp_channel_dropdown"></div>
                     </div>
                     <span class="help-text">Specific text channel where congratulations level-up announcements are sent.</span>
+                </div>
+
+                <!-- Level Role Rewards Section -->
+                <div style="border-top: 1px solid var(--border); padding-top: 1.25rem;">
+                    <h4 style="color: var(--text-heading); font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+                        Level Role Rewards
+                    </h4>
+                    <div class="checkbox-row" style="margin-bottom: 1rem;">
+                        <input type="checkbox" id="role_rewards_enabled" name="role_rewards_enabled" form="settingsForm">
+                        <label for="role_rewards_enabled">
+                            <div class="checkbox-label-title">Enable Level Role Rewards</div>
+                            <div class="checkbox-label-desc">Automatically award specific server roles to members upon reaching designated levels.</div>
+                        </label>
+                    </div>
+
+                    <!-- Add new reward row -->
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-bottom: 1rem;">
+                        <div style="width: 100px;">
+                            <label style="font-size: 0.8rem;">Level</label>
+                            <input type="number" id="new_reward_level" placeholder="5" min="1" style="padding: 0.5rem;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.8rem;">Role</label>
+                            <select id="new_reward_role_select" style="padding: 0.5rem;">
+                                <option value="">Select a role...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn-secondary" id="btnAddReward" style="height: 38px; padding: 0 1rem; display: flex; align-items: center; gap: 0.25rem;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                            Add
+                        </button>
+                    </div>
+
+                    <!-- Configured rewards list -->
+                    <div id="roleRewardsList" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.88rem; max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span style="color: var(--text-muted);">No role rewards configured.</span>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -930,7 +1023,10 @@
     <div class="modal-backdrop" id="voiceModal">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>🔊 Temporary Voice Settings</h3>
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5865F2" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+                    Temporary Voice Settings
+                </h3>
                 <button type="button" class="modal-close" onclick="closeModal('voiceModal')">&times;</button>
             </div>
             <div class="modal-body">
@@ -954,16 +1050,6 @@
                         <span style="color: var(--text-muted);">Loading hubs...</span>
                     </div>
                 </div>
-
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <h4 style="color: var(--text-heading); font-size: 0.95rem;">Active Temporary Rooms</h4>
-                        <span class="badge" id="voiceActiveRoomsCount">0 Active</span>
-                    </div>
-                    <div id="voiceActiveRoomsList" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.88rem; max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;">
-                        <span style="color: var(--text-muted);">Loading active rooms...</span>
-                    </div>
-                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-save-floating" onclick="closeModal('voiceModal')">Done</button>
@@ -975,7 +1061,10 @@
     <div class="modal-backdrop" id="gameroleModal">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>🎮 GameRole Settings</h3>
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5865F2" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="6"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/></svg>
+                    GameRole Settings
+                </h3>
                 <button type="button" class="modal-close" onclick="closeModal('gameroleModal')">&times;</button>
             </div>
             <div class="modal-body">
@@ -999,10 +1088,31 @@
         </div>
     </div>
 
+    <!-- Custom In-App Confirmation Modal -->
+    <div class="modal-backdrop" id="confirmModal">
+        <div class="modal-box" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3 id="confirmModalTitle">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FEE75C" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4m0 4h.01"/></svg>
+                    Confirm Action
+                </h3>
+                <button type="button" class="modal-close" id="confirmModalCloseBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmModalMessage" style="font-size: 0.95rem; line-height: 1.5; color: var(--text-normal);"></p>
+            </div>
+            <div class="modal-footer" style="gap: 0.75rem;">
+                <button type="button" class="btn-reset" id="confirmModalCancelBtn">Cancel</button>
+                <button type="button" class="btn-danger" id="confirmModalConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Floating Sticky Save Bar (Follows Scroll, Appears on Unsaved Changes) -->
     <div class="floating-save-bar" id="floatingSaveBar">
         <div class="save-bar-text">
-            <span>⚠️ Careful — you have unsaved changes!</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FEE75C" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4m0 4h.01"/></svg>
+            <span>Careful — you have unsaved changes!</span>
         </div>
         <div class="save-bar-actions">
             <button type="button" class="btn-reset" id="resetBtn">Reset</button>
@@ -1028,6 +1138,8 @@
 
         let currentGuildId = null;
         let originalFormState = {};
+        let currentRoleRewards = {};
+        let guildRolesCache = [];
 
         function showAlert(msg, isSuccess) {
             alertBox.textContent = msg;
@@ -1058,6 +1170,104 @@
             });
         });
 
+        // Role Rewards Manager in XP Modal
+        function renderRoleRewardsList() {
+            const list = document.getElementById('roleRewardsList');
+            const entries = Object.entries(currentRoleRewards).sort((a, b) => Number(a[0]) - Number(b[0]));
+            if (entries.length === 0) {
+                list.innerHTML = '<span style="color: var(--text-muted);">No role rewards configured yet.</span>';
+                return;
+            }
+            list.innerHTML = entries.map(([lvl, roleId]) => {
+                const roleObj = guildRolesCache.find(r => r.id === roleId);
+                const roleName = roleObj ? '@' + roleObj.name : `Role ID: ${roleId}`;
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <span>Level <strong>${lvl}</strong> &rarr; <span style="color: var(--accent); font-weight: 600;">${roleName}</span></span>
+                        <button type="button" class="btn-icon" style="width: 26px; height: 26px; border: none; color: var(--danger);" onclick="deleteRoleReward('${lvl}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showConfirmModal({ title = 'Confirm Action', message, confirmText = 'Confirm', isDestructive = false }) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('confirmModal');
+                document.getElementById('confirmModalTitle').innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${isDestructive ? '#F23F43' : '#FEE75C'}" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4m0 4h.01"/>
+                    </svg>
+                    ${title}
+                `;
+                document.getElementById('confirmModalMessage').innerHTML = message;
+                const confirmBtn = document.getElementById('confirmModalConfirmBtn');
+                const cancelBtn = document.getElementById('confirmModalCancelBtn');
+                const closeBtn = document.getElementById('confirmModalCloseBtn');
+
+                confirmBtn.textContent = confirmText;
+                confirmBtn.className = isDestructive ? 'btn-danger' : 'btn-save-floating';
+
+                modal.style.display = 'flex';
+
+                const cleanup = () => {
+                    modal.style.display = 'none';
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    closeBtn.removeEventListener('click', onCancel);
+                };
+
+                const onConfirm = () => {
+                    cleanup();
+                    resolve(true);
+                };
+                const onCancel = () => {
+                    cleanup();
+                    resolve(false);
+                };
+
+                confirmBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+                closeBtn.addEventListener('click', onCancel);
+            });
+        }
+
+        async function deleteRoleReward(lvl) {
+            const confirmed = await showConfirmModal({
+                title: 'Remove Role Reward',
+                message: `Are you sure you want to remove the role reward for <strong>Level ${lvl}</strong>?`,
+                confirmText: 'Remove Reward',
+                isDestructive: true
+            });
+            if (!confirmed) return;
+            delete currentRoleRewards[lvl];
+            renderRoleRewardsList();
+            checkFormChanges();
+        }
+
+        document.getElementById('btnAddReward').addEventListener('click', () => {
+            const lvlInput = document.getElementById('new_reward_level');
+            const roleSelect = document.getElementById('new_reward_role_select');
+            const lvl = parseInt(lvlInput.value, 10);
+            const roleId = roleSelect.value;
+
+            if (isNaN(lvl) || lvl < 1) {
+                showAlert('Please enter a valid level number (greater than 0).', false);
+                return;
+            }
+            if (!roleId) {
+                showAlert('Please select a role.', false);
+                return;
+            }
+
+            currentRoleRewards[String(lvl)] = roleId;
+            lvlInput.value = '';
+            roleSelect.value = '';
+            renderRoleRewardsList();
+            checkFormChanges();
+        });
+
         // Unsaved Changes Tracking
         function captureFormState() {
             const state = {};
@@ -1068,6 +1278,7 @@
                 if (!id) return;
                 state[id] = el.type === 'checkbox' ? el.checked : el.value;
             });
+            state['role_rewards'] = JSON.stringify(currentRoleRewards);
             return state;
         }
 
@@ -1103,6 +1314,12 @@
                     el.value = originalFormState[id];
                 }
             });
+            if (originalFormState['role_rewards']) {
+                try {
+                    currentRoleRewards = JSON.parse(originalFormState['role_rewards']);
+                    renderRoleRewardsList();
+                } catch {}
+            }
             checkFormChanges();
         }
 
@@ -1361,6 +1578,69 @@
             defaultLabel: 'Default (Current Channel / DM)'
         });
 
+        async function deleteVoiceHub(hubId, hubName) {
+            if (!currentGuildId) return;
+            const confirmDelete = await showConfirmModal({
+                title: 'Delete Voice Hub',
+                message: `Are you sure you want to delete the hub channel "<strong>${hubName}</strong>" and its parent category from Discord?`,
+                confirmText: 'Delete Hub',
+                isDestructive: true
+            });
+            if (!confirmDelete) return;
+
+            try {
+                const res = await fetch(`/api/guilds/${currentGuildId}/voice/hubs/${hubId}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    showAlert('Successfully deleted hub and category from server!', true);
+                    loadVoiceStatus(currentGuildId);
+                } else {
+                    const err = await res.json();
+                    showAlert(err.error || 'Failed to delete voice hub', false);
+                }
+            } catch {
+                showAlert('Network error while deleting voice hub', false);
+            }
+        }
+
+        async function loadVoiceStatus(guildId) {
+            if (!guildId) return;
+            const hubsListEl = document.getElementById('voiceHubsList');
+            const hubsBadge = document.getElementById('voiceHubsCount');
+
+            try {
+                const res = await fetch(`/api/guilds/${guildId}/voice`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const hubs = data.hubs || [];
+
+                hubsBadge.textContent = `${hubs.length} Hubs`;
+
+                if (hubs.length === 0) {
+                    hubsListEl.innerHTML = '<span style="color: var(--text-muted);">No hubs configured yet. Run <code>/voice setup</code> in Discord to create one!</span>';
+                } else {
+                    hubsListEl.innerHTML = hubs.map(h => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <span style="display: flex; align-items: center; gap: 0.4rem;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                                <strong>${h.name}</strong> 
+                                <span style="color: var(--text-muted); font-size: 0.8rem;">(in ${h.categoryName})</span>
+                            </span>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span class="badge">${h.hubChannelId}</span>
+                                <button type="button" class="btn-icon" style="width: 26px; height: 26px; border: none; color: var(--danger);" onclick="deleteVoiceHub('${h.hubChannelId}', '${h.name}')" title="Delete Hub & Category">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch {
+                hubsListEl.innerHTML = '<span style="color: var(--danger);">Failed to load voice hubs</span>';
+            }
+        }
+
         async function selectGuild(guildId, guildName) {
             currentGuildId = guildId;
 
@@ -1377,10 +1657,11 @@
             xpChannelCombobox.setLoading();
 
             try {
-                // Fetch settings and channels in parallel
-                const [settingsRes, channelsRes] = await Promise.all([
+                // Fetch settings, channels, and roles in parallel
+                const [settingsRes, channelsRes, rolesRes] = await Promise.all([
                     fetch(`/api/guilds/${guildId}/settings`),
-                    fetch(`/api/guilds/${guildId}/channels`)
+                    fetch(`/api/guilds/${guildId}/channels`),
+                    fetch(`/api/guilds/${guildId}/roles`)
                 ]);
 
                 if (!settingsRes.ok) throw new Error('Settings fetch failed');
@@ -1392,6 +1673,22 @@
                     const cData = await channelsRes.json();
                     channels = cData.channels || [];
                 }
+
+                if (rolesRes.ok) {
+                    const rData = await rolesRes.json();
+                    guildRolesCache = rData.roles || [];
+                } else {
+                    guildRolesCache = [];
+                }
+
+                // Populate Roles Select in XP Modal
+                const roleSelect = document.getElementById('new_reward_role_select');
+                roleSelect.innerHTML = '<option value="">Select a role...</option>' + 
+                    guildRolesCache.map(r => `<option value="${r.id}">@${r.name}</option>`).join('');
+
+                // Load Role Rewards
+                currentRoleRewards = s.role_rewards || {};
+                renderRoleRewardsList();
 
                 // Populate Searchable Comboboxes
                 logChannelCombobox.setReady();
@@ -1422,6 +1719,7 @@
                 document.getElementById('xp_min').value = s.xp_min ?? 10;
                 document.getElementById('xp_max').value = s.xp_max ?? 20;
                 document.getElementById('xp_voice_per_minute').value = s.xp_voice_per_minute ?? 5;
+                document.getElementById('role_rewards_enabled').checked = s.role_rewards_enabled ?? true;
 
                 // Populate Voice Settings Modal inputs
                 document.getElementById('voice_naming_scheme').value = s.voice_naming_scheme || s.voicemaster_naming_scheme || "{username}'s Room";
@@ -1431,6 +1729,9 @@
                 document.getElementById('gamerole_prefix').value = s.gamerole_prefix || 'PLAYING ';
                 document.getElementById('gamerole_color').value = s.gamerole_color || '#ff0000';
                 document.getElementById('gamerole_color_picker').value = (s.gamerole_color && /^#[0-9a-fA-F]{6}$/.test(s.gamerole_color)) ? s.gamerole_color : '#ff0000';
+
+                // Load voice hubs
+                loadVoiceStatus(guildId);
 
                 // Capture initial state for change detection
                 originalFormState = captureFormState();
@@ -1487,7 +1788,9 @@
                 voice_naming_scheme: document.getElementById('voice_naming_scheme').value.trim(),
                 voice_default_limit: Number(document.getElementById('voice_default_limit').value),
                 gamerole_prefix: document.getElementById('gamerole_prefix').value.trim() || 'PLAYING ',
-                gamerole_color: document.getElementById('gamerole_color').value.trim() || '#ff0000'
+                gamerole_color: document.getElementById('gamerole_color').value.trim() || '#ff0000',
+                role_rewards_enabled: document.getElementById('role_rewards_enabled').checked,
+                role_rewards: currentRoleRewards
             };
 
             try {
