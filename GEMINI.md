@@ -158,7 +158,7 @@ Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Un
 - Install dependencies: `npm install`
 - Run bot and dashboard: `npm start` (`node main.js` - starts both concurrently)
 - Run via Docker: `docker compose up -d`
-- Run tests: `npm test` (`vitest run` - full test suite of 90 tests)
+- Run tests: `npm test` (`vitest run` - full test suite of 92 tests)
 - Run dashboard standalone: `npm run dashboard` (`node dashboard/server.js`)
 - Deploy slash commands: `npm run deploy` (`node deploy-commands.js`)
 - Generate documentation: `npm run docs:generate` (`node scripts/generate-docs.js`)
@@ -217,6 +217,7 @@ Prefer single-file or single-test runs during iteration (e.g. `npx vitest run te
 - Never allow channel snowflake settings (`log_channel_id`, `xp_channel_id`, `*_channel_id`) to fall back to global settings in `SettingsManager.getGuild`; channel snowflakes are strictly unique to their guild.
 - When generating canvas graphics in Linux Docker containers with Skia / `@napi-rs/canvas`, install `fontconfig`, `fonts-dejavu-core`, and call `GlobalFonts.loadSystemFonts()` with a `"DejaVu Sans", sans-serif` font stack to prevent invisible text rendering.
 - Register module setting schemas dynamically on startup via `SettingsManager.registerSchema(mod.settings, moduleName)` for type-safe validation and access via `SettingsManager.getModuleSettings(guildId, moduleName)`.
+- For GameRole automated role assignment to function, enable the privileged Presence Intent in the Discord Developer Portal, grant the Manage Roles permission, and ensure the bot's role is positioned above member roles in the server role hierarchy.
 
 ---
 

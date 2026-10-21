@@ -18,7 +18,12 @@ export default {
         if (!newPresence || !newPresence.guild) return;
 
         const guild = newPresence.guild;
-        const member = newPresence.member;
+
+        // Fetch member if uncached
+        let member = newPresence.member;
+        if (!member && newPresence.userId) {
+            member = await guild.members.fetch(newPresence.userId).catch(() => null);
+        }
         if (!member || member.user?.bot) return;
 
         // Check module settings for this server
@@ -29,24 +34,44 @@ export default {
         const rolePrefix = SettingsManager.getGuild(guild.id, 'gamerole_prefix') || 'PLAYING ';
         const roleColor = SettingsManager.getGuild(guild.id, 'gamerole_color') || '#ff0000';
 
-        const oldActivity = oldPresence?.activities?.find(a => a.type === ActivityType.Playing);
-        const newActivity = newPresence.activities?.find(a => a.type === ActivityType.Playing);
+        const isGameActivity = (act) => {
+            if (!act || !act.name) return false;
+            // ActivityType.Playing = 0, ActivityType.Streaming = 1
+            return act.type === ActivityType.Playing || act.type === ActivityType.Streaming || act.type === 0 || act.type === 1;
+        };
 
-        const findRoleInGuild = (name) => {
+        const oldActivity = oldPresence?.activities?.find(isGameActivity);
+        const newActivity = newPresence.activities?.find(isGameActivity);
+
+        const findRoleInGuild = async (name) => {
             if (!guild.roles?.cache) return null;
             const lower = name.toLowerCase();
+            let role;
             if (typeof guild.roles.cache.find === 'function') {
-                return guild.roles.cache.find(r => r.name.toLowerCase() === lower);
+                role = guild.roles.cache.find(r => r.name.toLowerCase() === lower);
+            } else {
+                const values = typeof guild.roles.cache.values === 'function' ? Array.from(guild.roles.cache.values()) : guild.roles.cache;
+                role = values.find(r => r.name.toLowerCase() === lower);
             }
-            const values = typeof guild.roles.cache.values === 'function' ? Array.from(guild.roles.cache.values()) : guild.roles.cache;
-            return values.find(r => r.name.toLowerCase() === lower);
+
+            if (!role && typeof guild.roles.fetch === 'function') {
+                const fetched = await guild.roles.fetch().catch(() => null);
+                if (fetched) {
+                    if (typeof guild.roles.cache.find === 'function') {
+                        role = guild.roles.cache.find(r => r.name.toLowerCase() === lower);
+                    } else if (typeof fetched.find === 'function') {
+                        role = fetched.find(r => r.name.toLowerCase() === lower);
+                    }
+                }
+            }
+            return role;
         };
 
         try {
             // --- 1. REMOVE OLD ROLE (Stopped playing or switched games) ---
             if (oldActivity && oldActivity.name) {
                 const stoppedPlaying = !newActivity;
-                const switchedGame = newActivity && newActivity.name !== oldActivity.name;
+                const switchedGame = newActivity && newActivity.name.toLowerCase() !== oldActivity.name.toLowerCase();
 
                 if (stoppedPlaying || switchedGame) {
                     let oldRoleTarget = oldActivity.name;
@@ -63,10 +88,12 @@ export default {
                     }
 
                     const oldRoleName = rolePrefix + oldRoleTarget;
-                    const roleToRemove = findRoleInGuild(oldRoleName) || findRoleInGuild(rolePrefix + oldActivity.name);
+                    const roleToRemove = (await findRoleInGuild(oldRoleName)) || (await findRoleInGuild(rolePrefix + oldActivity.name));
 
                     if (roleToRemove && member.roles?.cache?.has(roleToRemove.id)) {
-                        await member.roles.remove(roleToRemove.id).catch(() => {});
+                        await member.roles.remove(roleToRemove.id).catch(err => {
+                            console.error(`[GAMEROLE ERROR] Failed to remove role "${roleToRemove.name}" from ${member.user?.tag}:`, err.message);
+                        });
                     }
                 }
             }
@@ -86,7 +113,7 @@ export default {
                     }
                     resolvedRoleName = customEntry.roleName || gameName;
                 } else {
-                    // Check default whitelist
+                    // Check default whitelist (case-insensitive)
                     const lowerGame = gameName.toLowerCase();
                     const defaultMatch = Object.entries(defaultWhitelist).find(
                         ([k]) => k.toLowerCase() === lowerGame
@@ -98,27 +125,30 @@ export default {
 
                 if (resolvedRoleName) {
                     const targetRoleName = rolePrefix + resolvedRoleName;
-                    let targetRole = findRoleInGuild(targetRoleName);
+                    let targetRole = await findRoleInGuild(targetRoleName);
 
                     // Create role if it does not exist
                     if (!targetRole) {
-                        const highestPos = guild.roles.highest?.rawPosition || 1;
                         targetRole = await guild.roles.create({
                             name: targetRoleName,
                             mentionable: true,
                             hoist: true,
-                            colors: { primaryColor: roleColor },
-                            position: Math.max(1, highestPos - 2)
-                        }).catch(() => null);
+                            colors: { primaryColor: roleColor }
+                        }).catch(err => {
+                            console.error(`[GAMEROLE ERROR] Failed to create role "${targetRoleName}" in guild "${guild.name}":`, err.message);
+                            return null;
+                        });
                     }
 
                     if (targetRole && !member.roles?.cache?.has(targetRole.id)) {
-                        await member.roles.add(targetRole.id).catch(() => {});
+                        await member.roles.add(targetRole.id).catch(err => {
+                            console.error(`[GAMEROLE ERROR] Failed to assign role "${targetRole.name}" to ${member.user?.tag}:`, err.message);
+                        });
                     }
                 }
             }
         } catch (error) {
-            // Gracefully ignore role permission or hierarchy errors
+            console.error(`[GAMEROLE ERROR] Error processing presence update in guild "${guild.name}":`, error);
         }
     },
 };

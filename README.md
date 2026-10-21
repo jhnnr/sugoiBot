@@ -103,6 +103,10 @@ sugoiBot/
      - **Message Content Intent** (required for XP message events)
      - **Presence Intent** (required for GameRole presence updates)
 
+5. Discord Role Hierarchy (Required for GameRole):
+   - In Discord **Server Settings** &rarr; **Roles**, drag the bot's role **above** member roles in the hierarchy list.
+   - Ensure the bot has the **Manage Roles** permission enabled so it can create and assign `PLAYING <Game>` roles.
+
 ---
 
 ## 🚀 Running the Project

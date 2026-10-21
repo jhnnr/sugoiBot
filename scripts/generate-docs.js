@@ -39,7 +39,8 @@ export async function generateDocs(rootDir = process.cwd()) {
                     modInfo = {
                         name: imported.name || modFolder,
                         description: imported.description || 'No description provided.',
-                        settings: imported.settings || []
+                        settings: imported.settings || [],
+                        setupGuide: imported.setupGuide || ''
                     };
                 }
             } catch (err) {
@@ -93,6 +94,11 @@ export async function generateDocs(rootDir = process.cwd()) {
         // Build Markdown Content
         let md = `# ${modInfo.name} Module\n\n`;
         md += `${modInfo.description}\n\n`;
+
+        // Setup & Prerequisites Section
+        if (modInfo.setupGuide) {
+            md += `## 📋 Setup & Prerequisites\n\n${modInfo.setupGuide.trim()}\n\n`;
+        }
 
         // Settings Section
         if (modInfo.settings && modInfo.settings.length > 0) {
