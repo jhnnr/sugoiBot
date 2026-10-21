@@ -12,9 +12,9 @@
 - [x] **Logging Service**: Implement a dedicated logging channel for bot events (guild join, command usage).
 - [x] **Member Classes**: Create a `Member` class in `lib/classes` to abstract database calls for user data.
 - [x] **Member Join & Invite Tracking**: Log new member joins with the inviter, invite code, and account age.
-- [ ] **GameRole Module Settings**: Add server settings for the GameRole module (customizable role prefix, role color, and whitelist toggle).
-- [ ] **Auto-Generated Module Settings Buttons**: If SettingsManager is used in a module, automatically render a settings button (`⚙️ Settings`) on the dashboard for that module.
-- [ ] **Role Rewards Management Command**: Add an in-Discord slash command (`/setreward`) to configure level role rewards.
+- [x] **GameRole Module Settings**: Add server settings for the GameRole module (customizable role prefix, role color, and whitelist toggle).
+- [x] **Auto-Generated Module Settings Buttons**: If SettingsManager is used in a module, automatically render a settings button (`⚙️ Settings`) on the dashboard for that module.
+- [x] **Role Rewards Management Command**: Add an in-Discord slash command (`/setreward`) to configure level role rewards.
 
 ## 🟢 Low Priority
 - [x] **Web Dashboard**: Create a basic Express.js backend to serve a settings dashboard with live configuration editing.
@@ -28,7 +28,7 @@
 - [x] Modular Architecture (Plug-and-play).
 - [x] Split Handlers (Module, Command, Event).
 - [x] SQLite Database Integration with transaction support (`SettingsManager.setGuildMany`).
-- [x] Basic XP Module with `/rank` and `/leaderboard` (Canvas card generation via `@napi-rs/canvas`).
+- [x] Basic XP Module with `/rank`, `/leaderboard`, and `/setreward` role rewards.
 - [x] Economy Module with `/balance`, `/daily`, `/work`, and `/coinflip`.
 - [x] Moderation Module with `/ban`, `/kick`, `/clear`, `/warn`, `/testlog`, and `/setlog`.
 - [x] GameRole Module with `/gamerole` and automated `presenceUpdate` role assignment (84 built-in games).
@@ -39,4 +39,4 @@
 - [x] Multi-Architecture Docker Containerization & Docker Compose (`linux/amd64`, `linux/arm64`).
 - [x] GitHub Actions CI/CD Pipeline (automated Vitest tests and Docker Hub multi-arch publishing with dynamic package.json version tagging).
 - [x] Automated Module Documentation Generator (`scripts/generate-docs.js`).
-- [x] Comprehensive Test Suite (90 unit tests across 15 test suites).
+- [x] Comprehensive Test Suite (94 unit tests across 15 test suites).

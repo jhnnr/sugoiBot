@@ -55,15 +55,20 @@ export const DEFAULT_GUILD_SETTINGS = {
     module_moderation_enabled: true,
     module_xp_enabled: true,
     module_gamerole_enabled: true,
-    gamerole_enabled: true,
     module_voice_enabled: true,
+    gamerole_enabled: true,
+    gamerole_prefix: 'PLAYING ',
+    gamerole_color: '#ff0000',
     voice_enabled: true,
+    voice_default_limit: 0,
+    voice_naming_scheme: "{username}'s Room",
     module_voicemaster_enabled: true,
     voicemaster_enabled: true,
     xp_enabled: true,
     xp_min: 10,
     xp_max: 20,
-    xp_voice_per_minute: 5
+    xp_voice_per_minute: 5,
+    role_rewards: {}
 };
 
 /**
@@ -418,6 +423,69 @@ app.get('/api/guilds/:guildId/channels', async (req, res) => {
         }
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch guild channels' });
+    }
+});
+
+app.get('/api/guilds/:guildId/voice', async (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId } = req.params;
+    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    try {
+        let hubs = db.prepare('SELECT * FROM voice_hubs WHERE guildId = ?').all(guildId);
+        if (!hubs || hubs.length === 0) {
+            hubs = db.prepare('SELECT * FROM voice_guilds WHERE guildId = ?').all(guildId);
+        }
+
+        const activeRooms = db.prepare('SELECT * FROM voice_channels WHERE guildId = ?').all(guildId);
+
+        let discordChannels = [];
+        if (process.env.DISCORD_TOKEN) {
+            try {
+                const cRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+                    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }
+                });
+                if (cRes.ok) discordChannels = await cRes.json();
+            } catch {}
+        }
+
+        const channelMap = new Map(discordChannels.map(c => [c.id, c]));
+
+        const enrichedHubs = (hubs || []).map(h => {
+            const ch = channelMap.get(h.hubChannelId);
+            const cat = channelMap.get(h.categoryId);
+            return {
+                hubChannelId: h.hubChannelId,
+                categoryId: h.categoryId,
+                name: ch ? ch.name : (h.hubChannelId ? `Hub (${h.hubChannelId})` : 'Join to Create'),
+                categoryName: cat ? cat.name : (h.categoryId ? `Category (${h.categoryId})` : 'None')
+            };
+        });
+
+        const enrichedRooms = (activeRooms || []).map(r => {
+            const ch = channelMap.get(r.channelId);
+            return {
+                channelId: r.channelId,
+                ownerId: r.ownerId,
+                name: ch ? ch.name : `Room (${r.channelId})`,
+                userLimit: ch ? ch.user_limit : 0,
+                createdAt: r.createdAt
+            };
+        });
+
+        res.json({
+            hubs: enrichedHubs,
+            activeRooms: enrichedRooms
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to retrieve voice status' });
     }
 });
 

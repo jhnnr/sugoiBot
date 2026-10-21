@@ -780,6 +780,7 @@
                                 <div class="checkbox-label-desc">Automatically assigns and removes roles based on member playing status.</div>
                             </label>
                         </div>
+                        <button type="button" class="btn-module-settings" onclick="openModal('gameroleModal')">⚙️ Settings</button>
                     </div>
 
                     <!-- Temporary Voice Module (With Settings Button) -->
@@ -943,9 +944,57 @@
                     <input type="number" id="voice_default_limit" name="voice_default_limit" min="0" max="99" form="settingsForm">
                     <span class="help-text">Default participant cap for newly spawned rooms (0 for unlimited).</span>
                 </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h4 style="color: var(--text-heading); font-size: 0.95rem;">Configured Hubs (Join to Create)</h4>
+                        <span class="badge" id="voiceHubsCount">0 Hubs</span>
+                    </div>
+                    <div id="voiceHubsList" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                        <span style="color: var(--text-muted);">Loading hubs...</span>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h4 style="color: var(--text-heading); font-size: 0.95rem;">Active Temporary Rooms</h4>
+                        <span class="badge" id="voiceActiveRoomsCount">0 Active</span>
+                    </div>
+                    <div id="voiceActiveRoomsList" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.88rem; max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;">
+                        <span style="color: var(--text-muted);">Loading active rooms...</span>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-save-floating" onclick="closeModal('voiceModal')">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GameRole Module Settings Modal -->
+    <div class="modal-backdrop" id="gameroleModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>🎮 GameRole Settings</h3>
+                <button type="button" class="modal-close" onclick="closeModal('gameroleModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="gamerole_prefix">Role Name Prefix</label>
+                    <input type="text" id="gamerole_prefix" name="gamerole_prefix" placeholder="PLAYING " form="settingsForm">
+                    <span class="help-text">Prefix added to auto-generated roles (e.g. <code>PLAYING Valorant</code>).</span>
+                </div>
+                <div class="form-group">
+                    <label for="gamerole_color">Role Color</label>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <input type="color" id="gamerole_color_picker" style="width: 48px; height: 38px; border: none; border-radius: 6px; cursor: pointer; background: transparent;" value="#ff0000">
+                        <input type="text" id="gamerole_color" name="gamerole_color" placeholder="#ff0000" form="settingsForm">
+                    </div>
+                    <span class="help-text">Hex color code applied to auto-generated game roles (e.g. <code>#ff0000</code>).</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-save-floating" onclick="closeModal('gameroleModal')">Done</button>
             </div>
         </div>
     </div>
@@ -1378,6 +1427,11 @@
                 document.getElementById('voice_naming_scheme').value = s.voice_naming_scheme || s.voicemaster_naming_scheme || "{username}'s Room";
                 document.getElementById('voice_default_limit').value = s.voice_default_limit ?? s.voicemaster_default_limit ?? 0;
 
+                // Populate GameRole Settings Modal inputs
+                document.getElementById('gamerole_prefix').value = s.gamerole_prefix || 'PLAYING ';
+                document.getElementById('gamerole_color').value = s.gamerole_color || '#ff0000';
+                document.getElementById('gamerole_color_picker').value = (s.gamerole_color && /^#[0-9a-fA-F]{6}$/.test(s.gamerole_color)) ? s.gamerole_color : '#ff0000';
+
                 // Capture initial state for change detection
                 originalFormState = captureFormState();
                 floatingSaveBar.classList.remove('visible');
@@ -1385,6 +1439,19 @@
                 showAlert('Failed to load settings for this server', false);
             }
         }
+
+        // Color picker sync
+        document.getElementById('gamerole_color_picker').addEventListener('input', (e) => {
+            document.getElementById('gamerole_color').value = e.target.value;
+            checkFormChanges();
+        });
+        document.getElementById('gamerole_color').addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+                document.getElementById('gamerole_color_picker').value = val;
+            }
+            checkFormChanges();
+        });
 
         // Handle Save Form
         document.getElementById('settingsForm').addEventListener('submit', async (e) => {
@@ -1418,7 +1485,9 @@
                 xp_max: Number(document.getElementById('xp_max').value),
                 xp_voice_per_minute: Number(document.getElementById('xp_voice_per_minute').value),
                 voice_naming_scheme: document.getElementById('voice_naming_scheme').value.trim(),
-                voice_default_limit: Number(document.getElementById('voice_default_limit').value)
+                voice_default_limit: Number(document.getElementById('voice_default_limit').value),
+                gamerole_prefix: document.getElementById('gamerole_prefix').value.trim() || 'PLAYING ',
+                gamerole_color: document.getElementById('gamerole_color').value.trim() || '#ff0000'
             };
 
             try {

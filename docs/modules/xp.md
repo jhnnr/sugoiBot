@@ -31,6 +31,16 @@ Check your rank
 
 - `user` (Optional): User to check
 
+### `/setreward`
+
+Configure role rewards earned at specific levels.
+
+#### Options
+
+- `add` (Optional): Assign a role reward to a specific level.
+- `remove` (Optional): Remove the role reward for a specific level.
+- `list` (Optional): List all configured level role rewards for this server.
+
 ## 🔔 Registered Events
 
 - **`messageCreate`** (Trigger: `On`)

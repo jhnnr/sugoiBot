@@ -139,19 +139,28 @@ export default {
             }
 
             const allHubs = db.prepare('SELECT * FROM voice_hubs WHERE guildId = ?').all(guild.id);
-            if (!allHubs || allHubs.length === 0) {
+            const activeRooms = db.prepare('SELECT * FROM voice_channels WHERE guildId = ?').all(guild.id);
+
+            if ((!allHubs || allHubs.length === 0) && (!activeRooms || activeRooms.length === 0)) {
                 return interaction.reply({
                     content: '⚠️ Temporary Voice is not configured yet in this server. Run `/voice setup` to deploy the system!',
                     ephemeral: true
                 });
             }
 
-            const hubsList = allHubs.map((h, i) => `**${i + 1}.** Hub: <#${h.hubChannelId}> (Category: <#${h.categoryId}>)`).join('\n');
+            const hubsList = (allHubs && allHubs.length > 0)
+                ? allHubs.map((h, i) => `**${i + 1}.** Hub: <#${h.hubChannelId}> (Category: <#${h.categoryId}>)`).join('\n')
+                : 'None configured yet.';
+
+            const roomsList = (activeRooms && activeRooms.length > 0)
+                ? activeRooms.map(r => `• <#${r.channelId}> • Host: <@${r.ownerId}>`).join('\n')
+                : '*No active temporary rooms right now.*';
 
             const embed = new EmbedBuilder()
-                .setTitle('🔊 Temporary Voice Configuration')
+                .setTitle('🔊 Temporary Voice Status')
                 .addFields(
-                    { name: `Active Hub Channels (${allHubs.length})`, value: hubsList || 'None', inline: false },
+                    { name: `Configured Hubs (${allHubs.length})`, value: hubsList.slice(0, 1024), inline: false },
+                    { name: `Active Temporary Rooms (${activeRooms.length})`, value: roomsList.slice(0, 1024), inline: false },
                     { name: 'Control Panel', value: 'Sent inside each temporary voice room chat box upon creation', inline: false }
                 )
                 .setColor(0x5865F2)

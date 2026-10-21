@@ -21,11 +21,24 @@ export default {
         const result = await member.addXP(xpToAdd);
 
         if (result.leveledUp) {
+            // Check role reward for this level
+            const rewards = SettingsManager.getGuildJson(message.guild.id, 'role_rewards', {});
+            const rewardRoleId = rewards[String(result.level)];
+            let roleEarnedText = '';
+
+            if (rewardRoleId && message.member?.roles) {
+                const rewardRole = message.guild.roles.cache.get(rewardRoleId) || await message.guild.roles.fetch(rewardRoleId).catch(() => null);
+                if (rewardRole && !message.member.roles.cache.has(rewardRole.id)) {
+                    await message.member.roles.add(rewardRole.id).catch(() => {});
+                    roleEarnedText = ` You unlocked the **${rewardRole.name}** role!`;
+                }
+            }
+
             const rawChannel = SettingsManager.getGuild(message.guild.id, 'xp_channel_id');
             const targetChannelId = rawChannel ? String(rawChannel).replace(/^["']|["']$/g, '').trim() : '';
             const targetChannel = targetChannelId ? (message.guild.channels.cache.get(targetChannelId) || await message.guild.channels.fetch(targetChannelId).catch(() => null)) : null;
 
-            const congratsText = `Congrats ${message.author}! Level up to **${result.level}**!`;
+            const congratsText = `Congrats ${message.author}! Level up to **${result.level}**!${roleEarnedText}`;
             if (targetChannel && typeof targetChannel.send === 'function') {
                 await targetChannel.send(congratsText).catch(() => message.reply(congratsText));
             } else {

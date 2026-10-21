@@ -158,7 +158,7 @@ Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Un
 - Install dependencies: `npm install`
 - Run bot and dashboard: `npm start` (`node main.js` - starts both concurrently)
 - Run via Docker: `docker compose up -d`
-- Run tests: `npm test` (`vitest run` - full test suite of 92 tests)
+- Run tests: `npm test` (`vitest run` - full test suite of 94 tests)
 - Run dashboard standalone: `npm run dashboard` (`node dashboard/server.js`)
 - Deploy slash commands: `npm run deploy` (`node deploy-commands.js`)
 - Generate documentation: `npm run docs:generate` (`node scripts/generate-docs.js`)

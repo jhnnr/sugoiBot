@@ -177,4 +177,57 @@ describe('XP Module', () => {
             logSpy.mockRestore();
         });
     });
+
+    describe('/setreward', () => {
+        it('should add a level role reward', async () => {
+            const { default: setrewardCommand } = await import('../modules/xp/commands/setreward.js');
+            const { SettingsManager } = await import('../lib/settings.js');
+            const setSpy = vi.spyOn(SettingsManager, 'setGuildJson').mockReturnValue();
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockReturnValue({});
+
+            const reply = vi.fn();
+            const interaction = {
+                guild: mockGuild,
+                options: {
+                    getSubcommand: () => 'add',
+                    getInteger: () => 5,
+                    getRole: () => ({ id: 'role_lvl5', toString: () => '<@&role_lvl5>' })
+                },
+                reply
+            };
+
+            await setrewardCommand.execute(interaction);
+
+            expect(setSpy).toHaveBeenCalledWith('g300', 'role_rewards', { '5': 'role_lvl5' });
+            expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('Configured role reward: Members reaching **Level 5**')
+            }));
+
+            setSpy.mockRestore();
+            getSpy.mockRestore();
+        });
+
+        it('should list configured role rewards', async () => {
+            const { default: setrewardCommand } = await import('../modules/xp/commands/setreward.js');
+            const { SettingsManager } = await import('../lib/settings.js');
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockReturnValue({ '5': 'role_5', '10': 'role_10' });
+
+            const reply = vi.fn();
+            const interaction = {
+                guild: mockGuild,
+                options: {
+                    getSubcommand: () => 'list'
+                },
+                reply
+            };
+
+            await setrewardCommand.execute(interaction);
+
+            expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+                embeds: expect.any(Array)
+            }));
+
+            getSpy.mockRestore();
+        });
+    });
 });

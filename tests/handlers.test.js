@@ -74,6 +74,7 @@ describe('Handlers', () => {
             expect(mockClient.commands.has('voice')).toBe(true);
             expect(mockClient.commands.has('testlog')).toBe(true);
             expect(mockClient.commands.has('setlog')).toBe(true);
+            expect(mockClient.commands.has('setreward')).toBe(true);
             expect(mockClient.commands.has('kick')).toBe(true);
         });
     });
