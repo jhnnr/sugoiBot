@@ -1281,6 +1281,8 @@
             document.getElementById('settingsForm').requestSubmit();
         }
 
+        let isSwitchingGuild = false;
+
         // Unsaved Changes Tracking
         function captureFormState() {
             const state = {};
@@ -1288,6 +1290,8 @@
             inputs.forEach(el => {
                 const id = el.id || el.name;
                 if (!id) return;
+                // Exclude search inputs, temporary creation inputs, and auxiliary pickers
+                if (id === 'log_channel_search' || id === 'xp_channel_search' || id === 'new_reward_level' || id === 'new_reward_role_select' || id === 'gamerole_color_picker') return;
                 state[id] = el.type === 'checkbox' ? el.checked : el.value;
             });
             state['role_rewards'] = JSON.stringify(currentRoleRewards);
@@ -1295,7 +1299,7 @@
         }
 
         function checkFormChanges() {
-            if (!currentGuildId) {
+            if (!currentGuildId || isSwitchingGuild || Object.keys(originalFormState).length === 0) {
                 floatingSaveBar.classList.remove('visible');
                 return;
             }
@@ -1703,6 +1707,9 @@
         }
 
         async function selectGuild(guildId, guildName) {
+            isSwitchingGuild = true;
+            floatingSaveBar.classList.remove('visible');
+            originalFormState = {};
             currentGuildId = guildId;
 
             document.querySelectorAll('.server-item').forEach(el => {
@@ -1797,8 +1804,16 @@
                 // Capture initial state for change detection
                 originalFormState = captureFormState();
                 floatingSaveBar.classList.remove('visible');
+
+                // Clear switching guard after DOM settles
+                setTimeout(() => {
+                    isSwitchingGuild = false;
+                    floatingSaveBar.classList.remove('visible');
+                }, 100);
             } catch (err) {
                 showAlert('Failed to load settings for this server', false);
+                isSwitchingGuild = false;
+                floatingSaveBar.classList.remove('visible');
             }
         }
 
