@@ -24,6 +24,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // In-memory session store (sessionId -> { user, guilds, expiresAt })
 export const sessions = new Map();
 
+// Active Discord client reference (when running in same process)
+let discordClient = null;
+
+export function setDiscordClient(client) {
+    discordClient = client;
+}
+
 // Bot guilds cache
 let botGuildsCache = { data: [], expiresAt: 0 };
 
@@ -424,14 +431,37 @@ app.get('/api/guilds/:guildId/channels', async (req, res) => {
         return res.status(403).json({ error: 'You do not have permission to manage this server.' });
     }
 
-    if (!process.env.DISCORD_TOKEN) {
+    // 1. Live Discord client in-memory resolution (instant & reliable)
+    if (discordClient) {
+        try {
+            const guild = discordClient.guilds.cache.get(guildId) || await discordClient.guilds.fetch(guildId).catch(() => null);
+            if (guild) {
+                const channels = await guild.channels.fetch().catch(() => guild.channels.cache);
+                const textChannels = Array.from(channels.values())
+                    .filter(c => c && (c.type === 0 || c.type === 5))
+                    .sort((a, b) => a.position - b.position)
+                    .map(c => ({
+                        id: c.id,
+                        name: c.name,
+                        type: c.type,
+                        parentId: c.parentId
+                    }));
+                return res.json({ channels: textChannels });
+            }
+        } catch (err) {}
+    }
+
+    // 2. Fallback to Discord REST API with sanitized token
+    const rawToken = process.env.DISCORD_TOKEN;
+    const botToken = rawToken ? rawToken.trim().replace(/^["']|["']$/g, '') : '';
+    if (!botToken) {
         return res.json({ channels: [] });
     }
 
     try {
         const discordRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
             headers: {
-                Authorization: `Bot ${process.env.DISCORD_TOKEN}`
+                Authorization: `Bot ${botToken}`
             }
         });
 
@@ -585,19 +615,42 @@ app.get('/api/guilds/:guildId/roles', async (req, res) => {
     }
 
     const { guildId } = req.params;
-    const targetGuild = (session.guilds || []).find(g => g.id === guildId);
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
     if (!targetGuild || !canManageGuild(targetGuild)) {
         return res.status(403).json({ error: 'You do not have permission to manage this server.' });
     }
 
-    if (!process.env.DISCORD_TOKEN) {
+    // 1. Live Discord client in-memory resolution (instant & reliable)
+    if (discordClient) {
+        try {
+            const guild = discordClient.guilds.cache.get(guildId) || await discordClient.guilds.fetch(guildId).catch(() => null);
+            if (guild) {
+                const roles = await guild.roles.fetch().catch(() => guild.roles.cache);
+                const roleList = Array.from(roles.values())
+                    .filter(r => r.id !== guildId && !r.managed)
+                    .sort((a, b) => b.position - a.position)
+                    .map(r => ({
+                        id: r.id,
+                        name: r.name,
+                        color: r.hexColor !== '#000000' ? r.hexColor : null,
+                        position: r.position
+                    }));
+                return res.json({ roles: roleList });
+            }
+        } catch (err) {}
+    }
+
+    // 2. Fallback to Discord REST API with sanitized token
+    const rawToken = process.env.DISCORD_TOKEN;
+    const botToken = rawToken ? rawToken.trim().replace(/^["']|["']$/g, '') : '';
+    if (!botToken) {
         return res.json({ roles: [] });
     }
 
     try {
         const discordRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
             headers: {
-                Authorization: `Bot ${process.env.DISCORD_TOKEN}`
+                Authorization: `Bot ${botToken}`
             }
         });
 

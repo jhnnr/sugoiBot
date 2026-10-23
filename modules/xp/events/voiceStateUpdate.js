@@ -38,7 +38,7 @@ export async function awardVoiceXP(memberObj, minutes, guildId) {
         const targetChannelId = rawChannel ? String(rawChannel).replace(/^["']|["']$/g, '').trim() : '';
         const targetChannel = targetChannelId ? (memberObj.guild.channels.cache.get(targetChannelId) || await memberObj.guild.channels.fetch(targetChannelId).catch(() => null)) : null;
 
-        const congratsText = `Congrats ${memberObj}! You leveled up to **${result.level}** by hanging out in voice!${roleEarnedText}`;
+        const congratsText = `Congrats ${memberObj}! Level up to **${result.level}**!${roleEarnedText}`;
         if (targetChannel && typeof targetChannel.send === 'function') {
             await targetChannel.send(congratsText).catch(() => {});
         } else {

@@ -23,7 +23,7 @@ process.on('uncaughtException', (error) => {
 
 async function start() {
     client.logger.info('Starting Sugoi Bot...');
-    startDashboard();
+    startDashboard(client);
     await loadModules(client);
     
     // Deploy commands without blocking bot startup
