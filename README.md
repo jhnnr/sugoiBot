@@ -16,13 +16,14 @@ A modern, modular, and scalable Discord bot framework and web dashboard built wi
   - Member leaves and avatar change auditing (showing previous vs. new profile pictures)
   - Message deletions (with uncached message support)
   - Channel creation & deletion (identifying who created or deleted the channel)
+  - Role creation & deletion (identifying who created or deleted the role)
   - Voice channel transitions (detecting who moved or disconnected the member via Audit Logs)
   - Command execution tracking (captures the full command with subcommands and arguments)
   - Diagnostic verification command (`/testlog`)
 - **💰 Economy System**: Coins and balance management (`/balance`, `/daily`, `/work`, and `/coinflip` betting).
 - **🛡️ Moderation Tools**: Administrative actions (`/ban`, `/kick`, `/warn`, `/clear`, `/setlog`, `/testlog`).
 - **⚙️ Dynamic Module Settings & Per-Guild Framework**: Robust SQLite database management with atomic batch transactions (`SettingsManager.setGuildMany`), dynamic schema registration, and module enable/disable switches.
-- **🧪 Comprehensive Test Suite**: 96 unit and integration tests across 15 test suites powered by Vitest.
+- **🧪 Comprehensive Test Suite**: 99 unit and integration tests across 15 test suites powered by Vitest.
 - **📚 Automated Documentation**: Automatically scans modules and syncs markdown pages with MkDocs (`npm run docs:generate`).
 
 ---

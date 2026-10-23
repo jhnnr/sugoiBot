@@ -158,7 +158,7 @@ Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Un
 - Install dependencies: `npm install`
 - Run bot and dashboard: `npm start` (`node main.js` - starts both concurrently)
 - Run via Docker: `docker compose up -d`
-- Run tests: `npm test` (`vitest run` - full test suite of 96 tests)
+- Run tests: `npm test` (`vitest run` - full test suite of 99 tests)
 - Run dashboard standalone: `npm run dashboard` (`node dashboard/server.js`)
 - Deploy slash commands: `npm run deploy` (`node deploy-commands.js`)
 - Generate documentation: `npm run docs:generate` (`node scripts/generate-docs.js`)
@@ -224,6 +224,9 @@ Prefer single-file or single-test runs during iteration (e.g. `npx vitest run te
 - In dashboard change detection, exclude search/helper inputs from `captureFormState()` and suppress change detection with an `isSwitchingGuild` guard during server switching transitions to prevent false-positive save bar displays.
 - Partition member XP and levels strictly per guild in SQLite via composite primary key `(guildId, userId)` rather than globally.
 - For continuous voice XP accumulation, run a 60-second background awarding interval using `SettingsManager.getGuildJson(guildId, 'xp_voice_per_minute', 5)` and register active voice members on startup.
+- In GameRole role creation, position newly created game roles directly at the bottom of all existing PLAYING roles in the server (clamped below the bot's own highest role).
+- Track role creation and deletion events with Audit Log executor lookup under `log_events_roles`.
+- Pass the active GigaClient to `startDashboard(client)` so channels, roles, and voice hubs resolve directly from live Discord.js memory cache instead of external REST calls.
 
 ---
 

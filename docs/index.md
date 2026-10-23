@@ -18,6 +18,7 @@ SugoiBot is designed from the ground up for extensibility, scalability, and perf
   - Member departures and avatar change auditing (showing previous vs. current avatars)
   - Message deletions (with uncached message support)
   - Channel creation & deletion (identifying who created or deleted the channel)
+  - Role creation & deletion (identifying who created or deleted the role)
   - Voice transitions (identifying who moved or disconnected the user via Audit Logs)
   - Command execution tracking (logging the full command with subcommands and options)
   - Diagnostic verification tool (`/testlog`) and in-server channel setup (`/setlog`)

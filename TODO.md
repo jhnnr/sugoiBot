@@ -39,12 +39,12 @@
 - [x] Basic XP Module with `/rank`, `/leaderboard`, and `/setreward` role rewards.
 - [x] Economy Module with `/balance`, `/daily`, `/work`, and `/coinflip`.
 - [x] Moderation Module with `/ban`, `/kick`, `/clear`, `/warn`, `/testlog`, and `/setlog`.
-- [x] GameRole Module with `/gamerole` and automated `presenceUpdate` role assignment (84 built-in games).
+- [x] GameRole Module with `/gamerole` and automated `presenceUpdate` role assignment (84 built-in games, customizable hierarchy position index, and automatic bottom stacking of PLAYING roles).
 - [x] Temporary Voice Module with `/voice setup`, dynamic Join-to-Create hubs, in-chat interactive controls, multi-hub support, and cross-server name persistence.
 - [x] Dynamic Module Settings Engine with automated schema registration, validation, and per-module settings retrieval (`SettingsManager.getModuleSettings`).
-- [x] Centralized Server Audit Logging (invites, leaves, avatar changes, message deletes, channel create/delete, voice moves with mover detection, command execution).
+- [x] Centralized Server Audit Logging (invites, leaves, avatar changes, message deletes, channel create/delete, role create/delete, voice moves with mover detection, command execution).
 - [x] Settings Management Framework and Web Dashboard UI with Discord OAuth2 login, searchable channel comboboxes, modular settings prompts, and floating sticky unsaved-changes save bar.
 - [x] Multi-Architecture Docker Containerization & Docker Compose (`linux/amd64`, `linux/arm64`).
 - [x] GitHub Actions CI/CD Pipeline (automated Vitest tests and Docker Hub multi-arch publishing with dynamic package.json version tagging).
 - [x] Automated Module Documentation Generator (`scripts/generate-docs.js`).
-- [x] Comprehensive Test Suite (94 unit tests across 15 test suites).
+- [x] Comprehensive Test Suite (99 unit tests across 15 test suites).
