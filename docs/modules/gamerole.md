@@ -27,6 +27,7 @@ The module includes 84 popular games enabled out-of-the-box. Use `/gamerole list
 | `gamerole_enabled` | Enable GameRole automated presence roles | `boolean` | `true` |
 | `gamerole_prefix` | Prefix for generated game roles | `string` | `PLAYING ` |
 | `gamerole_color` | Hex color for created roles | `string` | `#ff0000` |
+| `gamerole_position` | Hierarchy position index for created roles (0 = directly below bot) | `number` | `0` |
 
 ## ⌨️ Slash Commands
 

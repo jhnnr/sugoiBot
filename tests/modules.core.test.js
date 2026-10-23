@@ -297,4 +297,84 @@ describe('Core Module Events', () => {
             );
         });
     });
+
+    describe('roleCreate event', () => {
+        it('should log role creation with creator if audit log found', async () => {
+            const { default: roleCreateEvent } = await import('../modules/core/events/roleCreate.js');
+            const mockCreator = { id: 'admin1', tag: 'Creator#0001', toString: () => '<@admin1>' };
+            const mockGuild = {
+                id: 'g400',
+                members: {
+                    me: {
+                        permissions: { has: vi.fn().mockReturnValue(true) }
+                    }
+                },
+                fetchAuditLogs: vi.fn().mockResolvedValue({
+                    entries: {
+                        first: () => ({
+                            targetId: 'role_created_1',
+                            createdTimestamp: Date.now() - 500,
+                            executor: mockCreator
+                        })
+                    }
+                })
+            };
+
+            const mockRole = {
+                id: 'role_created_1',
+                name: 'VIP',
+                guild: mockGuild
+            };
+
+            await roleCreateEvent.execute(mockRole);
+
+            expect(loggingService.log).toHaveBeenCalledWith(
+                mockGuild,
+                expect.objectContaining({
+                    eventType: 'log_events_roles',
+                    description: expect.stringContaining('Role created: **VIP**')
+                })
+            );
+        });
+    });
+
+    describe('roleDelete event', () => {
+        it('should log role deletion with deleter if audit log found', async () => {
+            const { default: roleDeleteEvent } = await import('../modules/core/events/roleDelete.js');
+            const mockDeleter = { id: 'admin2', tag: 'Deleter#0002', toString: () => '<@admin2>' };
+            const mockGuild = {
+                id: 'g400',
+                members: {
+                    me: {
+                        permissions: { has: vi.fn().mockReturnValue(true) }
+                    }
+                },
+                fetchAuditLogs: vi.fn().mockResolvedValue({
+                    entries: {
+                        first: () => ({
+                            targetId: 'role_deleted_1',
+                            createdTimestamp: Date.now() - 500,
+                            executor: mockDeleter
+                        })
+                    }
+                })
+            };
+
+            const mockRole = {
+                id: 'role_deleted_1',
+                name: 'OldRole',
+                guild: mockGuild
+            };
+
+            await roleDeleteEvent.execute(mockRole);
+
+            expect(loggingService.log).toHaveBeenCalledWith(
+                mockGuild,
+                expect.objectContaining({
+                    eventType: 'log_events_roles',
+                    description: expect.stringContaining('Role deleted: **OldRole**')
+                })
+            );
+        });
+    });
 });

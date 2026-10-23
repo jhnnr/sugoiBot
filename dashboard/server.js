@@ -54,6 +54,7 @@ export const DEFAULT_GUILD_SETTINGS = {
     log_events_member_update: true,
     log_events_message_delete: true,
     log_events_channels: true,
+    log_events_roles: true,
     log_events_moderation: true,
     log_events_voice: false,
     log_events_commands: false,
@@ -731,7 +732,13 @@ app.post('/api/settings', (req, res) => {
     }
 });
 
-export function startDashboard(port = PORT) {
+export function startDashboard(clientOrPort = null, port = PORT) {
+    if (typeof clientOrPort === 'number' || typeof clientOrPort === 'string') {
+        port = clientOrPort;
+    } else if (clientOrPort) {
+        discordClient = clientOrPort;
+    }
+
     return app.listen(port, () => {
         console.log(`Dashboard running at http://localhost:${port}`);
     });

@@ -18,5 +18,7 @@ Essential bot functions and event handling.
 - **`interactionCreate`** (Trigger: `On`)
 - **`messageDelete`** (Trigger: `On`)
 - **`clientReady`** (Trigger: `Once`)
+- **`roleCreate`** (Trigger: `On`)
+- **`roleDelete`** (Trigger: `On`)
 - **`userUpdate`** (Trigger: `On`)
 

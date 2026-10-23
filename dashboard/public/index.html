@@ -903,6 +903,13 @@
                         </label>
                     </div>
                     <div class="checkbox-row">
+                        <input type="checkbox" id="log_events_roles" name="log_events_roles">
+                        <label for="log_events_roles">
+                            <div class="checkbox-label-title">Role Creations & Deletions</div>
+                            <div class="checkbox-label-desc">Logs when server roles are created or deleted, identifying who created or deleted them.</div>
+                        </label>
+                    </div>
+                    <div class="checkbox-row">
                         <input type="checkbox" id="log_events_moderation" name="log_events_moderation">
                         <label for="log_events_moderation">
                             <div class="checkbox-label-title">Moderation Actions</div>
@@ -1864,6 +1871,7 @@
                 document.getElementById('log_events_member_update').checked = s.log_events_member_update ?? true;
                 document.getElementById('log_events_message_delete').checked = s.log_events_message_delete ?? true;
                 document.getElementById('log_events_channels').checked = s.log_events_channels ?? true;
+                document.getElementById('log_events_roles').checked = s.log_events_roles ?? true;
                 document.getElementById('log_events_moderation').checked = s.log_events_moderation ?? true;
                 document.getElementById('log_events_voice').checked = s.log_events_voice ?? false;
                 document.getElementById('log_events_commands').checked = s.log_events_commands ?? false;
@@ -1941,6 +1949,7 @@
                 log_events_member_update: document.getElementById('log_events_member_update').checked,
                 log_events_message_delete: document.getElementById('log_events_message_delete').checked,
                 log_events_channels: document.getElementById('log_events_channels').checked,
+                log_events_roles: document.getElementById('log_events_roles').checked,
                 log_events_moderation: document.getElementById('log_events_moderation').checked,
                 log_events_voice: document.getElementById('log_events_voice').checked,
                 log_events_commands: document.getElementById('log_events_commands').checked,
