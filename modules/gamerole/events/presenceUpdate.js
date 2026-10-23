@@ -31,7 +31,10 @@ export default {
         const isGameRoleActive = SettingsManager.getGuildJson(guild.id, 'gamerole_enabled', true);
         if (!isModuleEnabled || !isGameRoleActive) return;
 
-        const rolePrefix = SettingsManager.getGuild(guild.id, 'gamerole_prefix') || 'PLAYING ';
+        const rawPrefix = SettingsManager.getGuild(guild.id, 'gamerole_prefix');
+        const rolePrefix = rawPrefix !== null && rawPrefix !== undefined
+            ? (rawPrefix.trim() ? `${rawPrefix.trim()} ` : '')
+            : 'PLAYING ';
         const roleColor = SettingsManager.getGuild(guild.id, 'gamerole_color') || '#ff0000';
 
         const isGameActivity = (act) => {
@@ -138,6 +141,38 @@ export default {
                             console.error(`[GAMEROLE ERROR] Failed to create role "${targetRoleName}" in guild "${guild.name}":`, err.message);
                             return null;
                         });
+
+                        if (targetRole) {
+                            try {
+                                const botHighestPos = guild.members?.me?.roles?.highest?.position || 1;
+                                const prefixCheck = (rolePrefix.trim() || 'PLAYING').toLowerCase();
+
+                                // Find all other existing playing roles in this guild
+                                const existingPlayingRoles = Array.from(guild.roles?.cache?.values() || []).filter(r => 
+                                    r.id !== targetRole.id && 
+                                    r.name.toLowerCase().startsWith(prefixCheck)
+                                );
+
+                                let targetPos = 1;
+                                if (existingPlayingRoles.length > 0) {
+                                    // Place at the bottom of all existing PLAYING roles
+                                    const lowestPlayingPos = Math.min(...existingPlayingRoles.map(r => r.position));
+                                    targetPos = Math.max(1, Math.min(botHighestPos - 1, lowestPlayingPos));
+                                } else {
+                                    // No existing playing roles: fall back to configured gamerole_position or directly below bot
+                                    const desiredPos = SettingsManager.getGuildJson(guild.id, 'gamerole_position', 0);
+                                    targetPos = desiredPos > 0
+                                        ? Math.min(botHighestPos - 1, Math.max(1, desiredPos))
+                                        : Math.max(1, botHighestPos - 1);
+                                }
+
+                                if (targetPos > 0 && targetRole.position !== targetPos) {
+                                    await targetRole.setPosition(targetPos).catch(e => {
+                                        console.warn(`[GAMEROLE] Could not set position ${targetPos} for role "${targetRole.name}":`, e.message);
+                                    });
+                                }
+                            } catch {}
+                        }
                     }
 
                     if (targetRole && !member.roles?.cache?.has(targetRole.id)) {

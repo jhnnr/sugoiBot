@@ -21,6 +21,7 @@ The module includes 84 popular games enabled out-of-the-box. Use \`/gamerole lis
     settings: [
         { key: 'gamerole_enabled', description: 'Enable GameRole automated presence roles', type: 'boolean', defaultValue: true },
         { key: 'gamerole_prefix', description: 'Prefix for generated game roles', type: 'string', defaultValue: 'PLAYING ' },
-        { key: 'gamerole_color', description: 'Hex color for created roles', type: 'string', defaultValue: '#ff0000' }
+        { key: 'gamerole_color', description: 'Hex color for created roles', type: 'string', defaultValue: '#ff0000' },
+        { key: 'gamerole_position', description: 'Hierarchy position index for created roles (0 = directly below bot)', type: 'number', defaultValue: 0, min: 0, max: 250 }
     ]
 };

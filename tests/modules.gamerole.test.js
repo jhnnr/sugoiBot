@@ -189,6 +189,35 @@ describe('GameRole Module', () => {
             expect(mockMember.roles.add).toHaveBeenCalledWith('role_lol');
         });
 
+        it('should place new PLAYING role at bottom of existing PLAYING roles', async () => {
+            const setPositionMock = vi.fn().mockResolvedValue();
+            const mockCreatedRole = { id: 'role_new', name: 'PLAYING Dota 2', position: 50, setPosition: setPositionMock };
+            mockGuild.roles.create.mockResolvedValue(mockCreatedRole);
+
+            // Existing playing roles at positions 20 and 15
+            mockGuild.roles.cache.set('existing1', { id: 'existing1', name: 'PLAYING Valorant', position: 20 });
+            mockGuild.roles.cache.set('existing2', { id: 'existing2', name: 'PLAYING Apex', position: 15 });
+            mockGuild.members = { me: { roles: { highest: { position: 30 } } } };
+
+            db.prepare.mockReturnValue({
+                get: vi.fn().mockReturnValue(undefined)
+            });
+
+            const oldPresence = { activities: [] };
+            const newPresence = {
+                guild: mockGuild,
+                member: mockMember,
+                activities: [{ type: 0, name: 'Dota 2' }]
+            };
+
+            await presenceUpdateEvent.execute(oldPresence, newPresence);
+
+            expect(mockGuild.roles.create).toHaveBeenCalledWith(expect.objectContaining({
+                name: 'PLAYING Dota 2'
+            }));
+            expect(setPositionMock).toHaveBeenCalledWith(15);
+        });
+
         it('should remove role when member stops playing', async () => {
             const existingRole = { id: 'role_val', name: 'PLAYING Valorant' };
             mockGuild.roles.cache.set(existingRole.id, existingRole);

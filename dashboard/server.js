@@ -66,6 +66,7 @@ export const DEFAULT_GUILD_SETTINGS = {
     gamerole_enabled: true,
     gamerole_prefix: 'PLAYING ',
     gamerole_color: '#ff0000',
+    gamerole_position: 0,
     voice_enabled: true,
     voice_default_limit: 0,
     voice_naming_scheme: "{username}'s Room",

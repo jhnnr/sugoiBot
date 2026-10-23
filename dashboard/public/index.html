@@ -1093,11 +1093,15 @@
                     </div>
                     <span class="help-text">Hex color code applied to auto-generated game roles (e.g. <code>#ff0000</code>).</span>
                 </div>
+                <div class="form-group">
+                    <label for="gamerole_position">Role Hierarchy Position (Index)</label>
+                    <input type="number" id="gamerole_position" name="gamerole_position" min="0" max="250" placeholder="0" form="settingsForm">
+                    <span class="help-text">Hierarchy position index for newly created game roles (<code>0</code> = placed directly below the bot's highest role). Clamped below the bot's role.</span>
+                </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
                 <button type="button" class="btn-reset" onclick="closeModal('gameroleModal')">Done</button>
                 <button type="button" class="btn-save-floating" onclick="submitSettingsFromModal('gameroleModal')">Save Changes</button>
-            </div>
             </div>
         </div>
     </div>
@@ -1878,6 +1882,7 @@
                 document.getElementById('gamerole_prefix').value = s.gamerole_prefix || 'PLAYING ';
                 document.getElementById('gamerole_color').value = s.gamerole_color || '#ff0000';
                 document.getElementById('gamerole_color_picker').value = (s.gamerole_color && /^#[0-9a-fA-F]{6}$/.test(s.gamerole_color)) ? s.gamerole_color : '#ff0000';
+                document.getElementById('gamerole_position').value = s.gamerole_position ?? 0;
 
                 // Load voice hubs
                 loadVoiceStatus(guildId);
@@ -1944,8 +1949,9 @@
                 xp_voice_per_minute: Number(document.getElementById('xp_voice_per_minute').value),
                 voice_naming_scheme: document.getElementById('voice_naming_scheme').value.trim(),
                 voice_default_limit: Number(document.getElementById('voice_default_limit').value),
-                gamerole_prefix: document.getElementById('gamerole_prefix').value.trim() || 'PLAYING ',
+                gamerole_prefix: document.getElementById('gamerole_prefix').value.trim() ? `${document.getElementById('gamerole_prefix').value.trim()} ` : '',
                 gamerole_color: document.getElementById('gamerole_color').value.trim() || '#ff0000',
+                gamerole_position: Number(document.getElementById('gamerole_position').value) || 0,
                 role_rewards_enabled: document.getElementById('role_rewards_enabled').checked,
                 role_rewards: currentRoleRewards
             };
