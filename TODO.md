@@ -13,6 +13,7 @@
 - [ ] **Moderation Warnings Web Viewer**: Add a server moderation interface on the dashboard to inspect, paginate, and revoke member warnings.
 - [ ] **Economy Server Shop & Inventory**: Allow administrators to configure server shop items and roles purchasable with economy currency.
 - [ ] **Custom Module Embed Colors**: Allow per-guild customization of bot embed accent colors directly from the dashboard.
+- [ ] **Admin Commands Permission**: Role based commands, set a role that can do a set of commands.
 - [x] **Moderation Module**: Implement basic moderation commands (`kick`, `ban`, `clear`, `warn`).
 - [x] **Economy Module**: Add a basic currency system (balance, daily, work, coinflip).
 - [x] **Logging Service**: Implement a dedicated logging channel for bot events (guild join, command usage).
