@@ -14,6 +14,7 @@
 - [ ] **Economy Server Shop & Inventory**: Allow administrators to configure server shop items and roles purchasable with economy currency.
 - [ ] **Custom Module Embed Colors**: Allow per-guild customization of bot embed accent colors directly from the dashboard.
 - [x] **Command Role Permissions & Subcommand Cascading**: Role-based permissions per module, searchable role comboboxes, and automatic parent-to-subcommand role cascading.
+- [ ] **Ability to select multiple roles in Command Role Permissions**
 - [x] **User Info Command**: User telemetry inspection command (`/userinfo`) displaying account age, join date, inviter, roles, permissions, level, rank, economy, and activity.
 - [x] **Moderation Module**: Implement basic moderation commands (`kick`, `ban`, `clear`, `warn`).
 - [x] **Economy Module**: Add a basic currency system (balance, daily, work, coinflip).
