@@ -4,6 +4,7 @@ import guildMemberRemoveEvent from '../modules/core/events/guildMemberRemove.js'
 import messageDeleteEvent from '../modules/core/events/messageDelete.js';
 import userUpdateEvent from '../modules/core/events/userUpdate.js';
 import guildMemberUpdateEvent from '../modules/core/events/guildMemberUpdate.js';
+import interactionCreateEvent from '../modules/core/events/interactionCreate.js';
 import { loggingService } from '../lib/bot/loggingService.js';
 import { SettingsManager } from '../lib/settings.js';
 
@@ -16,6 +17,7 @@ vi.mock('../lib/bot/loggingService.js', () => ({
 vi.mock('../lib/settings.js', () => ({
     SettingsManager: {
         getGuildJson: vi.fn().mockReturnValue(true),
+        setGuildJson: vi.fn().mockReturnValue(true),
         getGuild: vi.fn().mockReturnValue('log_ch_1'),
         get: vi.fn().mockReturnValue('log_ch_1')
     },
@@ -375,6 +377,203 @@ describe('Core Module Events', () => {
                     description: expect.stringContaining('Role deleted: **OldRole**')
                 })
             );
+        });
+    });
+
+    describe('/cmdperm command', () => {
+        it('should set command role requirement', async () => {
+            const { default: cmdpermCommand } = await import('../modules/core/commands/cmdperm.js');
+            const { SettingsManager } = await import('../lib/settings.js');
+            const setSpy = vi.spyOn(SettingsManager, 'setGuildJson').mockReturnValue();
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockReturnValue({});
+
+            const reply = vi.fn();
+            const interaction = {
+                guild: { id: 'g400' },
+                options: {
+                    getSubcommand: () => 'set',
+                    getString: () => 'ban',
+                    getRole: () => ({ id: 'role_mod', toString: () => '<@&role_mod>' })
+                },
+                reply
+            };
+
+            await cmdpermCommand.execute(interaction);
+
+            expect(setSpy).toHaveBeenCalledWith('g400', 'command_roles', { ban: 'role_mod' });
+            expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('now requires the <@&role_mod> role')
+            }));
+
+            setSpy.mockRestore();
+            getSpy.mockRestore();
+        });
+
+        it('should clear command role requirement', async () => {
+            const { default: cmdpermCommand } = await import('../modules/core/commands/cmdperm.js');
+            const { SettingsManager } = await import('../lib/settings.js');
+            const setSpy = vi.spyOn(SettingsManager, 'setGuildJson').mockReturnValue();
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockReturnValue({ ban: 'role_mod' });
+
+            const reply = vi.fn();
+            const interaction = {
+                guild: { id: 'g400' },
+                options: {
+                    getSubcommand: () => 'clear',
+                    getString: () => 'ban'
+                },
+                reply
+            };
+
+            await cmdpermCommand.execute(interaction);
+
+            expect(setSpy).toHaveBeenCalledWith('g400', 'command_roles', {});
+            expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('Reset `/ban` to default permissions')
+            }));
+
+            setSpy.mockRestore();
+            getSpy.mockRestore();
+        });
+    });
+
+    describe('interactionCreate command_roles gating', () => {
+        it('should reject command execution if user lacks the required role', async () => {
+            const { SettingsManager } = await import('../lib/settings.js');
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockImplementation((guildId, key) => {
+                if (key === 'command_roles') return { ban: 'role_required_1' };
+                return true;
+            });
+
+            const reply = vi.fn();
+            const mockCommand = { data: { name: 'ban' }, execute: vi.fn(), module: 'moderation' };
+            const interaction = {
+                isChatInputCommand: () => true,
+                commandName: 'ban',
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user123' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map() }
+                },
+                client: {
+                    commands: new Map([['ban', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply
+            };
+
+            await interactionCreateEvent.execute(interaction);
+
+            expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('You need the <@&role_required_1> role to use `/ban`'),
+                ephemeral: true
+            }));
+            expect(mockCommand.execute).not.toHaveBeenCalled();
+
+            getSpy.mockRestore();
+        });
+
+        it('should allow command execution if user has the required role', async () => {
+            const { SettingsManager } = await import('../lib/settings.js');
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockImplementation((guildId, key) => {
+                if (key === 'command_roles') return { ban: 'role_required_1' };
+                return true;
+            });
+
+            const reply = vi.fn();
+            const mockCommand = { data: { name: 'ban' }, execute: vi.fn(), module: 'moderation' };
+            const interaction = {
+                isChatInputCommand: () => true,
+                commandName: 'ban',
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user123' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map([['role_required_1', { id: 'role_required_1' }]]) }
+                },
+                client: {
+                    commands: new Map([['ban', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply
+            };
+
+            await interactionCreateEvent.execute(interaction);
+
+            expect(mockCommand.execute).toHaveBeenCalled();
+
+            getSpy.mockRestore();
+        });
+
+        it('should allow subcommand execution if user has the parent command role', async () => {
+            const { SettingsManager } = await import('../lib/settings.js');
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockImplementation((guildId, key) => {
+                if (key === 'command_roles') return { voice: 'role_voice_master' };
+                return true;
+            });
+
+            const reply = vi.fn();
+            const mockCommand = { data: { name: 'voice' }, execute: vi.fn(), module: 'voice' };
+            const interaction = {
+                isChatInputCommand: () => true,
+                commandName: 'voice',
+                options: { getSubcommand: () => 'lock' },
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user123' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map([['role_voice_master', { id: 'role_voice_master' }]]) }
+                },
+                client: {
+                    commands: new Map([['voice', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply
+            };
+
+            await interactionCreateEvent.execute(interaction);
+
+            expect(mockCommand.execute).toHaveBeenCalled();
+
+            getSpy.mockRestore();
+        });
+
+        it('should reject subcommand execution if user lacks the specific subcommand role override', async () => {
+            const { SettingsManager } = await import('../lib/settings.js');
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockImplementation((guildId, key) => {
+                if (key === 'command_roles') return { 'voice lock': 'role_vip_lock' };
+                return true;
+            });
+
+            const reply = vi.fn();
+            const mockCommand = { data: { name: 'voice' }, execute: vi.fn(), module: 'voice' };
+            const interaction = {
+                isChatInputCommand: () => true,
+                commandName: 'voice',
+                options: { getSubcommand: () => 'lock' },
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user123' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map() }
+                },
+                client: {
+                    commands: new Map([['voice', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply
+            };
+
+            await interactionCreateEvent.execute(interaction);
+
+            expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('You need the <@&role_vip_lock> role to use `/voice lock`'),
+                ephemeral: true
+            }));
+            expect(mockCommand.execute).not.toHaveBeenCalled();
+
+            getSpy.mockRestore();
         });
     });
 });

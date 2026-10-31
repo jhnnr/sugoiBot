@@ -8,6 +8,18 @@ Essential bot functions and event handling.
 | :--- | :--- | :--- | :--- |
 | `log_channel_id` | Channel ID for bot logs | `string` | `` |
 
+## ⌨️ Slash Commands
+
+### `/cmdperm`
+
+Configure required roles for executing specific commands (defaults to Everyone).
+
+#### Options
+
+- `set` (Optional): Require a specific role to execute a command.
+- `clear` (Optional): Reset a command to its default permissions (Everyone / Default).
+- `list` (Optional): List all custom command role permissions in this server.
+
 ## 🔔 Registered Events
 
 - **`channelCreate`** (Trigger: `On`)

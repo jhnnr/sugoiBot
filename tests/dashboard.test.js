@@ -216,5 +216,20 @@ describe('Dashboard API', () => {
             expect(data.modules.some(m => m.id === 'xp')).toBe(true);
             expect(data.modules.some(m => m.id === 'voice')).toBe(true);
         });
+
+        it('GET /api/commands discovers all commands across modules', async () => {
+            const res = await fetch(`${baseUrl}/api/commands`);
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.commands.length).toBeGreaterThan(0);
+            expect(data.commands.some(c => c.name === 'ping')).toBe(true);
+            expect(data.commands.some(c => c.name === 'userinfo')).toBe(true);
+            expect(data.commands.some(c => c.name === 'cmdperm')).toBe(true);
+
+            const voiceCmd = data.commands.find(c => c.name === 'voice');
+            expect(voiceCmd).toBeDefined();
+            expect(voiceCmd.subcommands).toBeInstanceOf(Array);
+            expect(voiceCmd.subcommands.length).toBeGreaterThan(0);
+        });
     });
 });

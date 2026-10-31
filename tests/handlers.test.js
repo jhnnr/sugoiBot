@@ -67,6 +67,7 @@ describe('Handlers', () => {
             expect(mockClient.modules.has('voice')).toBe(true);
 
             expect(mockClient.commands.has('ping')).toBe(true);
+            expect(mockClient.commands.has('userinfo')).toBe(true);
             expect(mockClient.commands.has('balance')).toBe(true);
             expect(mockClient.commands.has('coinflip')).toBe(true);
             expect(mockClient.commands.has('leaderboard')).toBe(true);
@@ -75,6 +76,7 @@ describe('Handlers', () => {
             expect(mockClient.commands.has('testlog')).toBe(true);
             expect(mockClient.commands.has('setlog')).toBe(true);
             expect(mockClient.commands.has('setreward')).toBe(true);
+            expect(mockClient.commands.has('cmdperm')).toBe(true);
             expect(mockClient.commands.has('kick')).toBe(true);
         });
     });

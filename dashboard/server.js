@@ -47,6 +47,7 @@ const DEFAULT_GLOBAL_SETTINGS = {
 };
 
 export const DEFAULT_GUILD_SETTINGS = {
+    command_roles: {},
     log_channel_id: '',
     xp_channel_id: '',
     log_events_member_join: true,
@@ -418,6 +419,61 @@ app.get('/api/modules', async (req, res) => {
         res.json({ modules: list });
     } catch (error) {
         res.status(500).json({ error: 'Failed to discover modules' });
+    }
+});
+
+app.get('/api/commands', async (req, res) => {
+    try {
+        const list = [];
+        if (discordClient?.commands && discordClient.commands.size > 0) {
+            for (const [name, cmd] of discordClient.commands.entries()) {
+                const json = typeof cmd.data?.toJSON === 'function' ? cmd.data.toJSON() : null;
+                const subcommands = (json?.options || [])
+                    .filter(o => o.type === 1)
+                    .map(s => ({ name: s.name, description: s.description || '' }));
+
+                list.push({
+                    name,
+                    module: cmd.module || 'general',
+                    description: cmd.data?.description || `Command /${name}`,
+                    subcommands
+                });
+            }
+        } else {
+            const modulesDir = path.resolve(__dirname, '..', 'modules');
+            const entries = fs.readdirSync(modulesDir).filter(f => fs.statSync(path.join(modulesDir, f)).isDirectory());
+            for (const mod of entries) {
+                const cmdDir = path.join(modulesDir, mod, 'commands');
+                if (fs.existsSync(cmdDir)) {
+                    const files = fs.readdirSync(cmdDir).filter(f => f.endsWith('.js'));
+                    for (const file of files) {
+                        try {
+                            const cmdUrl = pathToFileURL(path.join(cmdDir, file)).href;
+                            const cmd = (await import(cmdUrl)).default;
+                            if (cmd?.data) {
+                                const json = typeof cmd.data?.toJSON === 'function' ? cmd.data.toJSON() : null;
+                                const subcommands = (json?.options || [])
+                                    .filter(o => o.type === 1)
+                                    .map(s => ({ name: s.name, description: s.description || '' }));
+
+                                list.push({
+                                    name: cmd.data.name,
+                                    module: mod,
+                                    description: cmd.data.description || `Command /${cmd.data.name}`,
+                                    subcommands
+                                });
+                            }
+                        } catch {
+                            const name = file.replace('.js', '');
+                            list.push({ name, module: mod, description: `Command /${name}`, subcommands: [] });
+                        }
+                    }
+                }
+            }
+        }
+        res.json({ commands: list });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch commands' });
     }
 });
 

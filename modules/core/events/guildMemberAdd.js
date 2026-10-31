@@ -1,4 +1,5 @@
 import { Events } from 'discord.js';
+import db from '../../../lib/database.js';
 import { loggingService } from '../../../lib/bot/loggingService.js';
 import { SettingsManager } from '../../../lib/settings.js';
 
@@ -28,11 +29,23 @@ export default {
 
                 if (usedInvite) {
                     inviteCode = usedInvite.code;
+                    const inviterId = usedInvite.inviter ? usedInvite.inviter.id : null;
                     if (usedInvite.inviter) {
                         inviterInfo = `${usedInvite.inviter.tag} (<@${usedInvite.inviter.id}>)`;
                     } else {
                         inviterInfo = 'Server Vanity / System Invite';
                     }
+
+                    try {
+                        db.prepare(`
+                            INSERT INTO member_invites (guildId, userId, inviterId, inviteCode, timestamp)
+                            VALUES (?, ?, ?, ?, ?)
+                            ON CONFLICT(guildId, userId) DO UPDATE SET 
+                                inviterId = excluded.inviterId,
+                                inviteCode = excluded.inviteCode,
+                                timestamp = excluded.timestamp
+                        `).run(guild.id, member.id, inviterId, inviteCode, Date.now());
+                    } catch (e) {}
                 }
             }
         } catch (error) {

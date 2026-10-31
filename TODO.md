@@ -13,7 +13,8 @@
 - [ ] **Moderation Warnings Web Viewer**: Add a server moderation interface on the dashboard to inspect, paginate, and revoke member warnings.
 - [ ] **Economy Server Shop & Inventory**: Allow administrators to configure server shop items and roles purchasable with economy currency.
 - [ ] **Custom Module Embed Colors**: Allow per-guild customization of bot embed accent colors directly from the dashboard.
-- [ ] **Admin Commands Permission**: Role based commands, set a role that can do a set of commands.
+- [x] **Command Role Permissions & Subcommand Cascading**: Role-based permissions per module, searchable role comboboxes, and automatic parent-to-subcommand role cascading.
+- [x] **User Info Command**: User telemetry inspection command (`/userinfo`) displaying account age, join date, inviter, roles, permissions, level, rank, economy, and activity.
 - [x] **Moderation Module**: Implement basic moderation commands (`kick`, `ban`, `clear`, `warn`).
 - [x] **Economy Module**: Add a basic currency system (balance, daily, work, coinflip).
 - [x] **Logging Service**: Implement a dedicated logging channel for bot events (guild join, command usage).
@@ -44,8 +45,11 @@
 - [x] Temporary Voice Module with `/voice setup`, dynamic Join-to-Create hubs, in-chat interactive controls, multi-hub support, and cross-server name persistence.
 - [x] Dynamic Module Settings Engine with automated schema registration, validation, and per-module settings retrieval (`SettingsManager.getModuleSettings`).
 - [x] Centralized Server Audit Logging (invites, leaves, avatar changes, message deletes, channel create/delete, role create/delete, voice moves with mover detection, command execution).
+- [x] Modular Per-Command Role Permissions (individual command and subcommand role gating in `interactionCreate.js`, `/cmdperm`, per-module searchable role comboboxes, parent-to-subcommand role cascading).
+- [x] User Info Command (`/userinfo` with full telemetry: account age, server join date, inviter, roles, permissions, XP level/rank, economy balance, warnings, presence).
+- [x] In-App Confirmation Modal & Background Scroll Locking (`#confirmModal`, Promise-based `showConfirmModal`, `document.body.style.overflow = 'hidden'`).
 - [x] Settings Management Framework and Web Dashboard UI with Discord OAuth2 login, searchable channel comboboxes, modular settings prompts, and floating sticky unsaved-changes save bar.
 - [x] Multi-Architecture Docker Containerization & Docker Compose (`linux/amd64`, `linux/arm64`).
 - [x] GitHub Actions CI/CD Pipeline (automated Vitest tests and Docker Hub multi-arch publishing with dynamic package.json version tagging).
 - [x] Automated Module Documentation Generator (`scripts/generate-docs.js`).
-- [x] Comprehensive Test Suite (99 unit tests across 15 test suites).
+- [x] Comprehensive Test Suite (108 unit tests across 15 test suites).

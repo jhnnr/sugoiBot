@@ -1,4 +1,4 @@
-import { Events, Collection } from 'discord.js';
+import { Events, Collection, PermissionFlagsBits } from 'discord.js';
 import { SettingsManager } from '../../../lib/settings.js';
 import { loggingService } from '../../../lib/bot/loggingService.js';
 
@@ -64,6 +64,35 @@ export default {
                     content: `The **${command.module}** module is currently disabled in this server.`,
                     ephemeral: true
                 });
+            }
+        }
+
+        // Per-command & subcommand role permission requirement (defaults to None / everyone)
+        if (interaction.guild) {
+            const commandRoles = SettingsManager.getGuildJson(interaction.guild.id, 'command_roles', {});
+            const subcommand = typeof interaction.options?.getSubcommand === 'function' 
+                ? interaction.options.getSubcommand(false) 
+                : null;
+            const subKey = subcommand ? `${interaction.commandName} ${subcommand}` : null;
+
+            // Check subcommand override first, then fall back to parent command role
+            let requiredRoleId = subKey ? commandRoles[subKey] : null;
+            if (!requiredRoleId) {
+                requiredRoleId = commandRoles[interaction.commandName];
+            }
+
+            if (requiredRoleId) {
+                const isOwner = interaction.guild.ownerId === interaction.user.id;
+                const isAdmin = interaction.member?.permissions?.has(PermissionFlagsBits.Administrator);
+                const hasRole = interaction.member?.roles?.cache?.has(requiredRoleId);
+
+                if (!isOwner && !isAdmin && !hasRole) {
+                    const cmdDisplay = subKey ? `/${subKey}` : `/${interaction.commandName}`;
+                    return interaction.reply({
+                        content: `⚠️ You need the <@&${requiredRoleId}> role to use \`${cmdDisplay}\`.`,
+                        ephemeral: true
+                    });
+                }
             }
         }
 

@@ -765,9 +765,15 @@
                             <input type="checkbox" id="module_general_enabled" name="module_general_enabled">
                             <label for="module_general_enabled">
                                 <div class="checkbox-label-title">General Module</div>
-                                <div class="checkbox-label-desc">General bot utilities like /ping.</div>
+                                <div class="checkbox-label-desc">General bot utilities like /ping and /userinfo.</div>
                             </label>
                         </div>
+                        <button type="button" class="btn-icon" aria-label="Settings" onclick="openModal('generalModal')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
                     </div>
 
                     <!-- Economy Module -->
@@ -779,6 +785,12 @@
                                 <div class="checkbox-label-desc">Currency commands: /balance, /daily, /work, and /coinflip.</div>
                             </label>
                         </div>
+                        <button type="button" class="btn-icon" aria-label="Settings" onclick="openModal('economyModal')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
                     </div>
 
                     <!-- Moderation Module -->
@@ -790,6 +802,12 @@
                                 <div class="checkbox-label-desc">Moderation tools: /ban, /kick, /warn, /clear, and /setlog.</div>
                             </label>
                         </div>
+                        <button type="button" class="btn-icon" aria-label="Settings" onclick="openModal('moderationModal')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
                     </div>
 
                     <!-- XP & Leveling Module (With Gear Button) -->
@@ -1024,6 +1042,18 @@
                         <span style="color: var(--text-muted);">No role rewards configured.</span>
                     </div>
                 </div>
+
+                <!-- Command Role Permissions for XP Module -->
+                <div style="border-top: 1px solid var(--border); padding-top: 1.25rem;">
+                    <h4 style="color: var(--text-heading); font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Command Role Permissions
+                    </h4>
+                    <p class="help-text" style="margin-bottom: 0.75rem;">Assign a required role to execute commands in this module. Defaults to <code>None (Everyone / Default)</code>.</p>
+                    <div class="module-cmd-roles" data-module="xp" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Loading commands...</span>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
                 <button type="button" class="btn-reset" onclick="closeModal('xpModal')">Done</button>
@@ -1068,6 +1098,18 @@
                         <span style="color: var(--text-muted);">Loading hubs...</span>
                     </div>
                 </div>
+
+                <!-- Command Role Permissions for Voice Module -->
+                <div style="border-top: 1px solid var(--border); padding-top: 1.25rem;">
+                    <h4 style="color: var(--text-heading); font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Command Role Permissions
+                    </h4>
+                    <p class="help-text" style="margin-bottom: 0.75rem;">Assign a required role to execute commands in this module. Defaults to <code>None (Everyone / Default)</code>.</p>
+                    <div class="module-cmd-roles" data-module="voice" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Loading commands...</span>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
                 <button type="button" class="btn-reset" onclick="closeModal('voiceModal')">Done</button>
@@ -1105,10 +1147,109 @@
                     <input type="number" id="gamerole_position" name="gamerole_position" min="0" max="250" placeholder="0" form="settingsForm">
                     <span class="help-text">Hierarchy position index for newly created game roles (<code>0</code> = placed directly below the bot's highest role). Clamped below the bot's role.</span>
                 </div>
+
+                <!-- Command Role Permissions for GameRole Module -->
+                <div style="border-top: 1px solid var(--border); padding-top: 1.25rem;">
+                    <h4 style="color: var(--text-heading); font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Command Role Permissions
+                    </h4>
+                    <p class="help-text" style="margin-bottom: 0.75rem;">Assign a required role to execute commands in this module. Defaults to <code>None (Everyone / Default)</code>.</p>
+                    <div class="module-cmd-roles" data-module="gamerole" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Loading commands...</span>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
                 <button type="button" class="btn-reset" onclick="closeModal('gameroleModal')">Done</button>
                 <button type="button" class="btn-save-floating" onclick="submitSettingsFromModal('gameroleModal')">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- General Module Settings Modal -->
+    <div class="modal-backdrop" id="generalModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5865F2" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                    General Settings
+                </h3>
+                <button type="button" class="modal-close" onclick="closeModal('generalModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <h4 style="color: var(--text-heading); font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Command Role Permissions
+                    </h4>
+                    <p class="help-text" style="margin-bottom: 0.75rem;">Assign a required role to execute general commands (e.g. <code>/userinfo</code>, <code>/ping</code>). Defaults to <code>None (Everyone / Default)</code>.</p>
+                    <div class="module-cmd-roles" data-module="general" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Loading commands...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn-reset" onclick="closeModal('generalModal')">Done</button>
+                <button type="button" class="btn-save-floating" onclick="submitSettingsFromModal('generalModal')">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Economy Module Settings Modal -->
+    <div class="modal-backdrop" id="economyModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5865F2" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+                    Economy Settings
+                </h3>
+                <button type="button" class="modal-close" onclick="closeModal('economyModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <h4 style="color: var(--text-heading); font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Command Role Permissions
+                    </h4>
+                    <p class="help-text" style="margin-bottom: 0.75rem;">Assign a required role to execute economy commands. Defaults to <code>None (Everyone / Default)</code>.</p>
+                    <div class="module-cmd-roles" data-module="economy" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Loading commands...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn-reset" onclick="closeModal('economyModal')">Done</button>
+                <button type="button" class="btn-save-floating" onclick="submitSettingsFromModal('economyModal')">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Moderation Module Settings Modal -->
+    <div class="modal-backdrop" id="moderationModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5865F2" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Moderation Settings
+                </h3>
+                <button type="button" class="modal-close" onclick="closeModal('moderationModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <h4 style="color: var(--text-heading); font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Command Role Permissions
+                    </h4>
+                    <p class="help-text" style="margin-bottom: 0.75rem;">Assign a required role to execute moderation commands (e.g. <code>/ban</code>, <code>/kick</code>, <code>/warn</code>, <code>/clear</code>). Defaults to <code>None (Everyone / Default)</code>.</p>
+                    <div class="module-cmd-roles" data-module="moderation" style="background-color: var(--bg-primary); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Loading commands...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn-reset" onclick="closeModal('moderationModal')">Done</button>
+                <button type="button" class="btn-save-floating" onclick="submitSettingsFromModal('moderationModal')">Save Changes</button>
             </div>
         </div>
     </div>
@@ -1164,7 +1305,338 @@
         let currentGuildId = null;
         let originalFormState = {};
         let currentRoleRewards = {};
+        let currentCommandRoles = {};
+        let allCommandsCache = [];
         let guildRolesCache = [];
+
+        async function loadAllCommands() {
+            try {
+                const res = await fetch('/api/commands');
+                if (res.ok) {
+                    const data = await res.json();
+                    allCommandsCache = data.commands || [];
+                    renderCommandRolesList();
+                }
+            } catch (e) {}
+        }
+
+        function setupRoleCombobox({
+            wrapperId,
+            searchInputId,
+            dropdownId,
+            cmdName,
+            roles,
+            selectedRoleId,
+            onSelect
+        }) {
+            const wrapper = document.getElementById(wrapperId);
+            const searchInput = document.getElementById(searchInputId);
+            const dropdown = document.getElementById(dropdownId);
+            if (!wrapper || !searchInput || !dropdown) return;
+
+            let allRoles = roles || [];
+            let currentId = selectedRoleId || '';
+
+            function getDisplayText(id) {
+                if (!id) return '';
+                const match = allRoles.find(r => r.id === id);
+                return match ? '@' + match.name : `Role ID: ${id}`;
+            }
+
+            searchInput.value = getDisplayText(currentId);
+
+            function render(filter = '') {
+                const query = filter.toLowerCase().trim().replace(/^@/, '');
+                const filtered = allRoles.filter(r =>
+                    r.name.toLowerCase().includes(query) || r.id.includes(query)
+                );
+
+                dropdown.innerHTML = '';
+
+                // Default None option
+                const defaultItem = document.createElement('div');
+                defaultItem.className = 'combobox-item' + (!currentId ? ' selected' : '');
+                defaultItem.innerHTML = `<span>None (Everyone / Default)</span>`;
+                defaultItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectRole('');
+                });
+                dropdown.appendChild(defaultItem);
+
+                if (filtered.length === 0 && query) {
+                    if (/^\d{17,20}$/.test(query)) {
+                        const customItem = document.createElement('div');
+                        customItem.className = 'combobox-item';
+                        customItem.innerHTML = `<span>@<strong>${query}</strong></span>`;
+                        customItem.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            selectRole(query);
+                        });
+                        dropdown.appendChild(customItem);
+                    } else {
+                        const empty = document.createElement('div');
+                        empty.className = 'combobox-empty';
+                        empty.textContent = 'No matching roles found';
+                        dropdown.appendChild(empty);
+                    }
+                } else {
+                    for (const r of filtered) {
+                        const item = document.createElement('div');
+                        item.className = 'combobox-item' + (currentId === r.id ? ' selected' : '');
+                        const dotColor = r.color || '#949ba4';
+                        item.innerHTML = `
+                            <span style="display: flex; align-items: center; gap: 0.45rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${dotColor}; flex-shrink: 0; display: inline-block;"></span>
+                                <strong>@${r.name}</strong>
+                            </span>
+                        `;
+                        item.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            selectRole(r.id);
+                        });
+                        dropdown.appendChild(item);
+                    }
+                }
+            }
+
+            function selectRole(roleId) {
+                currentId = roleId;
+                searchInput.value = getDisplayText(roleId);
+                dropdown.classList.remove('open');
+                onSelect(cmdName, roleId);
+            }
+
+            function syncValueFromInput() {
+                const query = searchInput.value.trim();
+                if (!query) {
+                    selectRole('');
+                    return;
+                }
+
+                if (/^\d{17,20}$/.test(query)) {
+                    selectRole(query);
+                    return;
+                }
+
+                const clean = query.replace(/^@/, '').toLowerCase();
+                const exact = allRoles.find(r => r.name.toLowerCase() === clean || r.id === query);
+                if (exact) {
+                    selectRole(exact.id);
+                    return;
+                }
+
+                const filtered = allRoles.filter(r => r.name.toLowerCase().includes(clean));
+                if (filtered.length === 1) {
+                    selectRole(filtered[0].id);
+                    return;
+                }
+
+                searchInput.value = getDisplayText(currentId);
+            }
+
+            searchInput.addEventListener('focus', () => {
+                const query = searchInput.value.startsWith('@') ? '' : searchInput.value;
+                render(query);
+                dropdown.classList.add('open');
+            });
+
+            searchInput.addEventListener('input', () => {
+                const query = searchInput.value;
+                render(query.startsWith('@') ? query.slice(1) : query);
+                dropdown.classList.add('open');
+
+                if (/^\d{17,20}$/.test(query.trim())) {
+                    currentId = query.trim();
+                    onSelect(cmdName, currentId);
+                } else if (!query.trim()) {
+                    currentId = '';
+                    onSelect(cmdName, '');
+                }
+            });
+
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    syncValueFromInput();
+                    dropdown.classList.remove('open');
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#' + wrapperId)) {
+                    dropdown.classList.remove('open');
+                    syncValueFromInput();
+                }
+            });
+        }
+
+        function toggleSubcommands(cmdName) {
+            const el = document.getElementById(`subcmds_${cmdName}`);
+            const chev = document.getElementById(`chev_${cmdName}`);
+            if (!el) return;
+            const isOpen = el.style.display !== 'none';
+            el.style.display = isOpen ? 'none' : 'flex';
+            if (chev) chev.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+        }
+
+        function renderCommandRolesList() {
+            document.querySelectorAll('.module-cmd-roles').forEach(container => {
+                const mod = container.getAttribute('data-module');
+                const moduleCmds = allCommandsCache.filter(c => c.module === mod);
+
+                if (moduleCmds.length === 0) {
+                    container.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem;">No commands in this module.</span>';
+                    return;
+                }
+
+                container.innerHTML = moduleCmds.map(cmd => {
+                    const hasSubs = cmd.subcommands && cmd.subcommands.length > 0;
+                    const wrapperId = `cmd_role_wrap_${cmd.name}`;
+                    const searchId = `cmd_role_search_${cmd.name}`;
+                    const dropId = `cmd_role_drop_${cmd.name}`;
+
+                    let subHtml = '';
+                    if (hasSubs) {
+                        subHtml = `
+                            <div class="subcommands-container" id="subcmds_${cmd.name}" style="display: none; padding-left: 1.25rem; border-left: 2px solid var(--border); margin: 0.35rem 0 0.5rem 0.5rem; flex-direction: column; gap: 0.4rem;">
+                                ${cmd.subcommands.map(sub => {
+                                    const subKey = `${cmd.name}_${sub.name}`;
+                                    const subWrap = `cmd_role_wrap_${subKey}`;
+                                    const subSearch = `cmd_role_search_${subKey}`;
+                                    const subDrop = `cmd_role_drop_${subKey}`;
+                                    return `
+                                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.25rem 0;">
+                                            <div style="flex: 1; overflow: hidden;">
+                                                <div style="font-weight: 600; color: var(--text-normal); font-size: 0.85rem;">/${cmd.name} ${sub.name}</div>
+                                                <div style="font-size: 0.75rem; color: var(--text-muted);">${sub.description || ''}</div>
+                                            </div>
+                                            <div style="width: 210px; flex-shrink: 0;">
+                                                <div class="combobox-wrapper" id="${subWrap}">
+                                                    <div class="combobox-input-container">
+                                                        <input type="text"
+                                                               class="combobox-input cmd-role-search-input"
+                                                               id="${subSearch}"
+                                                               placeholder="Inherit parent / select..."
+                                                               autocomplete="off"
+                                                               style="padding: 0.35rem 1.8rem 0.35rem 0.55rem; font-size: 0.78rem; height: 28px;">
+                                                        <span class="combobox-arrow" style="right: 0.5rem;">
+                                                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                                                        </span>
+                                                    </div>
+                                                    <div class="combobox-dropdown" id="${subDrop}"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div style="border-bottom: 1px solid rgba(255,255,255,0.05); padding: 0.4rem 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                                <div style="flex: 1; overflow: hidden; display: flex; align-items: center; gap: 0.4rem;">
+                                    ${hasSubs ? `
+                                        <button type="button" class="btn-icon" style="width: 22px; height: 22px; border: none; padding: 0;" onclick="toggleSubcommands('${cmd.name}')" title="Toggle subcommands">
+                                            <svg id="chev_${cmd.name}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition: transform 0.2s;"><path d="m9 18 6-6-6-6"/></svg>
+                                        </button>
+                                    ` : ''}
+                                    <div>
+                                        <div style="font-weight: 600; color: var(--text-heading); font-size: 0.9rem;">
+                                            /${cmd.name}
+                                            ${hasSubs ? `<span style="color: var(--text-muted); font-size: 0.75rem; font-weight: normal; margin-left: 0.35rem;">(${cmd.subcommands.length} subcommands)</span>` : ''}
+                                        </div>
+                                        <div style="font-size: 0.78rem; color: var(--text-muted);">${cmd.description || 'Command /' + cmd.name}</div>
+                                    </div>
+                                </div>
+                                <div style="width: 230px; flex-shrink: 0;">
+                                    <div class="combobox-wrapper" id="${wrapperId}">
+                                        <div class="combobox-input-container">
+                                            <input type="text"
+                                                   class="combobox-input cmd-role-search-input"
+                                                   id="${searchId}"
+                                                   placeholder="Filter @role or ID..."
+                                                   autocomplete="off"
+                                                   style="padding: 0.4rem 2rem 0.4rem 0.65rem; font-size: 0.82rem; height: 32px;">
+                                            <span class="combobox-arrow" style="right: 0.6rem;">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                                            </span>
+                                        </div>
+                                        <div class="combobox-dropdown" id="${dropId}"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            ${subHtml}
+                        </div>
+                    `;
+                }).join('');
+
+                // Initialize role combobox for parent commands and their subcommands
+                moduleCmds.forEach(cmd => {
+                    setupRoleCombobox({
+                        wrapperId: `cmd_role_wrap_${cmd.name}`,
+                        searchInputId: `cmd_role_search_${cmd.name}`,
+                        dropdownId: `cmd_role_drop_${cmd.name}`,
+                        cmdName: cmd.name,
+                        roles: guildRolesCache,
+                        selectedRoleId: currentCommandRoles[cmd.name] || '',
+                        onSelect: (commandName, roleId) => {
+                            if (roleId) {
+                                currentCommandRoles[commandName] = roleId;
+                            } else {
+                                delete currentCommandRoles[commandName];
+                            }
+
+                            // Cascade parent role to all subcommands
+                            if (cmd.subcommands && cmd.subcommands.length > 0) {
+                                const roleObj = guildRolesCache.find(r => r.id === roleId);
+                                const roleText = roleObj ? '@' + roleObj.name : (roleId ? '@' + roleId : '');
+
+                                cmd.subcommands.forEach(sub => {
+                                    const subKey = `${cmd.name} ${sub.name}`;
+                                    if (roleId) {
+                                        currentCommandRoles[subKey] = roleId;
+                                    } else {
+                                        delete currentCommandRoles[subKey];
+                                    }
+                                    const subInput = document.getElementById(`cmd_role_search_${cmd.name}_${sub.name}`);
+                                    if (subInput) {
+                                        subInput.value = roleText;
+                                    }
+                                });
+                            }
+
+                            checkFormChanges();
+                        }
+                    });
+
+                    // Initialize each subcommand's combobox
+                    if (cmd.subcommands && cmd.subcommands.length > 0) {
+                        cmd.subcommands.forEach(sub => {
+                            const subKey = `${cmd.name} ${sub.name}`;
+                            const subIdKey = `${cmd.name}_${sub.name}`;
+                            setupRoleCombobox({
+                                wrapperId: `cmd_role_wrap_${subIdKey}`,
+                                searchInputId: `cmd_role_search_${subIdKey}`,
+                                dropdownId: `cmd_role_drop_${subIdKey}`,
+                                cmdName: subKey,
+                                roles: guildRolesCache,
+                                selectedRoleId: currentCommandRoles[subKey] || '',
+                                onSelect: (fullSubName, roleId) => {
+                                    if (roleId) {
+                                        currentCommandRoles[fullSubName] = roleId;
+                                    } else {
+                                        delete currentCommandRoles[fullSubName];
+                                    }
+                                    checkFormChanges();
+                                }
+                            });
+                        });
+                    }
+                });
+            });
+        }
 
         function showAlert(msg, isSuccess) {
             alertBox.textContent = msg;
@@ -1173,13 +1645,26 @@
             setTimeout(() => { alertBox.style.display = 'none'; }, 4500);
         }
 
+        function updateBodyScrollLock() {
+            const hasOpenModal = Array.from(document.querySelectorAll('.modal-backdrop'))
+                .some(m => m.style.display === 'flex' || window.getComputedStyle(m).display === 'flex');
+            if (hasOpenModal) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        }
+
         // Modal Controls
         async function openModal(modalId) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
             modal.style.display = 'flex';
+            updateBodyScrollLock();
 
             if (!currentGuildId) return;
+
+            renderCommandRolesList();
 
             if (modalId === 'voiceModal') {
                 await loadVoiceStatus(currentGuildId);
@@ -1383,10 +1868,11 @@
                 const id = el.id || el.name;
                 if (!id) return;
                 // Exclude search inputs, temporary creation inputs, and auxiliary pickers
-                if (id === 'log_channel_search' || id === 'xp_channel_search' || id === 'new_reward_level' || id === 'new_reward_role_select' || id === 'gamerole_color_picker') return;
+                if (id === 'log_channel_search' || id === 'xp_channel_search' || id === 'new_reward_level' || id === 'new_reward_role_select' || id === 'gamerole_color_picker' || id.startsWith('cmd_role_search_') || el.classList.contains('cmd-role-search-input')) return;
                 state[id] = el.type === 'checkbox' ? el.checked : el.value;
             });
             state['role_rewards'] = JSON.stringify(currentRoleRewards);
+            state['command_roles'] = JSON.stringify(currentCommandRoles);
             return state;
         }
 
@@ -1427,6 +1913,12 @@
                     renderRoleRewardsList();
                 } catch {}
             }
+            if (originalFormState['command_roles']) {
+                try {
+                    currentCommandRoles = JSON.parse(originalFormState['command_roles']);
+                    renderCommandRolesList();
+                } catch {}
+            }
             checkFormChanges();
         }
 
@@ -1461,6 +1953,7 @@
                     renderLoggedInUser(data.user);
                     loadStats();
                     loadGuilds();
+                    loadAllCommands();
                 } else {
                     renderLoggedOut();
                 }
@@ -1846,6 +2339,10 @@
                 roleSelect.innerHTML = '<option value="">Select a role...</option>' + 
                     guildRolesCache.map(r => `<option value="${r.id}">@${r.name}</option>`).join('');
 
+                // Load Command Roles
+                currentCommandRoles = s.command_roles || {};
+                renderCommandRolesList();
+
                 // Load Role Rewards
                 currentRoleRewards = s.role_rewards || {};
                 renderRoleRewardsList();
@@ -1933,6 +2430,7 @@
             saveFloatingBtn.textContent = 'Saving...';
 
             const payload = {
+                command_roles: currentCommandRoles,
                 module_general_enabled: document.getElementById('module_general_enabled').checked,
                 module_economy_enabled: document.getElementById('module_economy_enabled').checked,
                 module_moderation_enabled: document.getElementById('module_moderation_enabled').checked,

@@ -158,7 +158,7 @@ Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Un
 - Install dependencies: `npm install`
 - Run bot and dashboard: `npm start` (`node main.js` - starts both concurrently)
 - Run via Docker: `docker compose up -d`
-- Run tests: `npm test` (`vitest run` - full test suite of 99 tests)
+- Run tests: `npm test` (`vitest run` - full test suite of 108 tests)
 - Run dashboard standalone: `npm run dashboard` (`node dashboard/server.js`)
 - Deploy slash commands: `npm run deploy` (`node deploy-commands.js`)
 - Generate documentation: `npm run docs:generate` (`node scripts/generate-docs.js`)
@@ -227,6 +227,10 @@ Prefer single-file or single-test runs during iteration (e.g. `npx vitest run te
 - In GameRole role creation, position newly created game roles directly at the bottom of all existing PLAYING roles in the server (clamped below the bot's own highest role).
 - Track role creation and deletion events with Audit Log executor lookup under `log_events_roles`.
 - Pass the active GigaClient to `startDashboard(client)` so channels, roles, and voice hubs resolve directly from live Discord.js memory cache instead of external REST calls.
+- Enforce modular per-command role permission gating in `interactionCreate.js` using `command_roles` (defaulting to None/everyone), bypassable by Administrators and guild owners.
+- Store member join invite attribution in `member_invites (guildId, userId, inviterId, inviteCode, timestamp)` to support member telemetry and audit tracking.
+- In dashboard modals, lock `document.body` background scrolling (`overflow = 'hidden'`) whenever any modal is displayed and restore on close.
+- When configuring parent command roles on the dashboard, cascade the role selection to all subcommands in the UI and allow individual subcommand overrides.
 
 ---
 
