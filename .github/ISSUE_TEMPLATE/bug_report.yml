@@ -19,6 +19,7 @@ body:
         - Web Dashboard (OAuth2, Settings UI, API)
         - Database / SettingsManager (SQLite)
         - Docker / Deployment / CI
+        - Other
     validations:
       required: true
 
