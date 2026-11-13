@@ -1,0 +1,58 @@
+name: Feature Request
+description: Suggest a new module, slash command, dashboard feature, or enhancement for SugoiBot.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Target Module / Area
+      description: Which area of SugoiBot does this feature apply to?
+      options:
+        - New Plug-and-Play Module
+        - Core / Audit Logging
+        - General
+        - Economy
+        - Moderation
+        - XP & Leveling
+        - GameRole
+        - Temporary Voice
+        - Web Dashboard
+        - Database / SettingsManager
+        - Documentation / Docker / CI
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this feature solve, or what server workflow would it improve?
+      placeholder: As a server administrator / member, I want to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe how the slash command, gateway event, or dashboard setting should work.
+      placeholder: Describe the expected behavior, commands, or settings...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative workarounds or designs you have considered.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context or Mockups
+      description: Add any other context, Discord embed examples, or dashboard UI screenshots about the feature request.
+    validations:
+      required: false

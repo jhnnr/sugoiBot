@@ -1,0 +1,83 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in SugoiBot or the Web Dashboard.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Module / Component
+      description: Which part of SugoiBot is affected?
+      options:
+        - Core / Audit Logging
+        - General (/ping, /userinfo)
+        - Economy (/balance, /daily, /work, /coinflip)
+        - Moderation (/ban, /kick, /warn, /clear, /cmdperm, /setlog)
+        - XP & Leveling (/rank, /leaderboard, /setreward)
+        - GameRole (/gamerole, Rich Presence)
+        - Temporary Voice (/voice, Join-to-Create)
+        - Web Dashboard (OAuth2, Settings UI, API)
+        - Database / SettingsManager (SQLite)
+        - Docker / Deployment / CI
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what went wrong...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Exact steps to reproduce the behavior.
+      placeholder: |
+        1. Run command or open dashboard page '...'
+        2. Click on or pass option '...'
+        3. Observe error '...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Runtime Environment
+      description: How are you running SugoiBot?
+      options:
+        - Node.js (npm start)
+        - Docker / Docker Compose
+        - Standalone Dashboard (npm run dashboard)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: SugoiBot & Node.js Version
+      description: Specify the SugoiBot version (from package.json or Docker tag) and Node.js version if applicable.
+      placeholder: e.g. v1.3.0, Node.js v22.14.0
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: Paste any relevant console output, stack traces, or attach screenshots.
+      render: shell
+    validations:
+      required: false
