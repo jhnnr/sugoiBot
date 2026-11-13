@@ -1,15 +1,10 @@
-# AGENTS.md
+# GEMINI.md
 
-Drop-in operating instructions for coding agents. Read this file before every task.
+Behavioral instructions, workflow discipline, and persistent instructional memory for Gemini CLI and Google Antigravity agents.
+
+For repository stack, commands, directory layout, and project conventions, see `AGENTS.md`.
 
 **Working code only. Finish the job. Plausibility is not correctness.**
-
-This file follows the [AGENTS.md](https://agents.md) open standard (Linux Foundation / Agentic AI Foundation). Claude Code, Codex, Cursor, Windsurf, Copilot, Aider, Devin, Amp read it natively. For tools that look elsewhere, symlink:
-
-```bash
-ln -s AGENTS.md CLAUDE.md
-ln -s AGENTS.md GEMINI.md
-```
 
 ---
 
@@ -30,7 +25,7 @@ These rules override everything else in this file when in conflict:
 **Goal: understand the problem and the codebase before producing a diff.**
 
 - State your plan in one or two sentences before editing. For anything non-trivial, produce a numbered list of steps with a verification check for each.
-- Read the files you will touch. Read the files that call the files you will touch. Claude Code: use subagents for exploration so the main context stays clean.
+- Read the files you will touch. Read the files that call the files you will touch. Use subagents for broad exploration so the main context stays clean.
 - Match existing patterns in the codebase. If the project uses pattern X, use pattern X, even if you'd do it differently in a greenfield repo.
 - Surface assumptions out loud: "I'm assuming you want X, Y, Z. If that's wrong, say so." Do not bury assumptions inside the implementation.
 - If two approaches exist, present both with tradeoffs. Do not pick one silently. Exception: trivial tasks (typo, rename, log line) where the diff fits in one sentence.
@@ -101,8 +96,8 @@ For every task:
 
 - Context is the constraint. Long sessions with accumulated failed attempts perform worse than fresh sessions with a better prompt.
 - After two failed corrections on the same issue, stop. Summarize what you learned and ask the user to reset the session with a sharper prompt.
-- Use subagents (Claude Code: "use subagents to investigate X") for exploration tasks that would otherwise pollute the main context with dozens of file reads.
-- When committing, write descriptive commit messages (subject under 72 chars, body explains the why). No "update file" or "fix bug" commits. No "Co-Authored-By: Claude" attribution unless the project explicitly wants it.
+- Use subagents for exploration tasks that would otherwise pollute the main context with dozens of file reads.
+- When committing, write descriptive commit messages (subject under 72 chars, body explains the why). No "update file" or "fix bug" commits. No AI co-author attribution unless the project explicitly wants it.
 
 ---
 
@@ -140,70 +135,13 @@ After every session where the agent did something wrong:
 1. Ask: was the mistake because this file lacks a rule, or because the agent ignored a rule?
 2. If lacking: add the rule under "Project Learnings" below, written as concretely as possible ("Always use X for Y" not "be careful with Y").
 3. If ignored: the rule may be too long, too vague, or buried. Tighten it or move it up.
-4. Every few weeks, prune. For each line, ask: "Would removing this cause the agent to make a mistake?" If no, delete. Bloated AGENTS.md files get ignored wholesale.
-
-Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Under 300 is a good ceiling. Over 500 and you are fighting your own config.
+4. Every few weeks, prune. For each line, ask: "Would removing this cause the agent to make a mistake?" If no, delete. Bloated rule files get ignored wholesale.
 
 ---
 
-## 10. Project context
+## 10. Project Learnings
 
-### Stack
-- Language and version: `Node.js 18+ / 22 / 24 (ESM)`
-- Frameworks: `discord.js v14`, `express v5`, `better-sqlite3 v13`, `@napi-rs/canvas v1`, `vitest v4`
-- Package manager: `npm`
-- Database: `SQLite` (via `better-sqlite3` in `data/database.sqlite`)
-
-### Commands
-- Install dependencies: `npm install`
-- Run bot and dashboard: `npm start` (`node main.js` - starts both concurrently)
-- Run via Docker: `docker compose up -d`
-- Run tests: `npm test` (`vitest run` - full test suite of 108 tests)
-- Run dashboard standalone: `npm run dashboard` (`node dashboard/server.js`)
-- Deploy slash commands: `npm run deploy` (`node deploy-commands.js`)
-- Generate documentation: `npm run docs:generate` (`node scripts/generate-docs.js`)
-
-Prefer single-file or single-test runs during iteration (e.g. `npx vitest run tests/modules.voice.test.js`). Full suites are for the final verification pass.
-
-### Layout
-- `modules/`: Plug-and-play modules (`core`, `general`, `economy`, `moderation`, `xp`, `gamerole`, `voice`). Each module has `index.js`, optional `commands/`, and optional `events/`.
-- `handlers/`: Autoloaders for modules, commands, and events (`moduleHandler.js`, `commandHandler.js`, `eventHandler.js`).
-- `lib/`:
-  - `database.js`: SQLite schema initialization (`settings`, `guild_settings`, `users`, `xp`, `warnings`, `currency`, `gamerole_whitelist`, `voice_hubs`, `voice_channels`, `voice_user_settings`).
-  - `settings.js`: `SettingsManager` for global and per-guild configuration (`get`, `set`, `getGuild`, `setGuild`, `getAllGuild`, `setGuildMany`).
-  - `bot/`: `GigaClient.js` (client with intents & partials), `loggingService.js` (centralized audit embed logging).
-  - `classes/`: `Member.js` (OOP database abstraction for XP, currency, warnings).
-  - `utils/`: `rankCard.js` (Canvas rank card generator), `leaderboardCard.js` (Canvas leaderboard card generator), `formatters.js`.
-- `dashboard/`:
-  - `server.js`: Express server with Discord OAuth2 login, guild management API, per-guild settings management, and stats.
-  - `public/`: Frontend (`index.html`) with login landing page, server selector, active module checkboxes, log checkboxes, XP/economy settings.
-- `docker-compose.yml`, `Dockerfile`, `entrypoint.sh`: Multi-arch containerization (`linux/amd64`, `linux/arm64`) with `gosu` privilege de-escalation for non-root `/app/data` volume permissions.
-- `.github/workflows/docker-publish.yml`: CI/CD workflow running Vitest and building/pushing multi-arch Docker images with dynamic `package.json` version tagging.
-- `docs/`: MkDocs documentation with automated module docs (`docs/modules/*.md`).
-- `tests/`: 15 Vitest test suites covering all modules, handlers, utilities, and endpoints.
-
-### Conventions specific to this repo
-- JavaScript ESM (`"type": "module"`). Always use `.js` extension in relative imports.
-- Always load `.env` using explicit path relative to root (`path.resolve(__dirname, '..', '.env')` or `path.resolve(__dirname, '.env')`) to prevent `process.cwd()` mismatch errors when launched from subdirectories.
-- For SQLite batch operations, use `SettingsManager.setGuildMany` with transactions to avoid V8 GC churn on native statements.
-- In `loggingService.log`, pass `user: <User>` so the author header displays the user's avatar and tag, with Discord native timestamp (`embed.setTimestamp()`). Avoid redundant footer text.
-- All slash commands use Discord.js `SlashCommandBuilder`. Commands store `command.module = moduleName` in `commandHandler.js`.
-- Modules can be enabled or disabled per guild via `module_<name>_enabled` settings, enforced in `interactionCreate.js` and module events.
-- For Discord.js `RoleManager.create()`, pass `colors: { primaryColor }` instead of deprecated `color`.
-- In `deploy-commands.js`, use a single atomic `rest.put(...)` request without preceding `PUT []` to avoid hitting Discord's global application command rate-limit lock.
-- In `modules/voice/`, temporary voice rooms send their control panel directly into the voice channel's integrated text chat box upon creation; no separate static text channels are created.
-
-### Forbidden
-- Do not make two consecutive `rest.put` calls in `deploy-commands.js` (such as clearing with `[]` then uploading); this triggers Discord rate limit stalls.
-- Do not use multi-codepoint ZWJ emoji sequences (like `👁️‍🗨️`) in Discord button `setEmoji()`; use standard single-codepoint emojis.
-- Do not store channel snowflake IDs with literal quotes in SQLite; sanitize with `replace(/^["']|["']$/g, '')`.
-- Do not block bot login or dashboard startup behind global command deployment.
-
----
-
-## 11. Project Learnings
-
-**Accumulated corrections. This section is for the agent to maintain, not just the human.**
+**Accumulated corrections and persistent instructional memory.**
 
 - Always load `.env` using an explicit root path relative to `__dirname` to avoid missing environment variables when executed from subdirectories.
 - Always include `Partials` (Message, Channel, GuildMember, User) in `GigaClient` so Discord emits events for uncached structures.
@@ -219,7 +157,7 @@ Prefer single-file or single-test runs during iteration (e.g. `npx vitest run te
 - Register module setting schemas dynamically on startup via `SettingsManager.registerSchema(mod.settings, moduleName)` for type-safe validation and access via `SettingsManager.getModuleSettings(guildId, moduleName)`.
 - For GameRole automated role assignment to function, enable the privileged Presence Intent in the Discord Developer Portal, grant the Manage Roles permission, and ensure the bot's role is positioned above member roles in the server role hierarchy.
 - Strictly do not use emojis in the UI of the web dashboard; use clean, minimalist SVGs instead. In the dashboard module list, render a gear icon SVG button without the word "Settings".
-- In dashboard OAuth authentication, ensure session.guilds is strictly validated and sanitized as an Array to prevent TypeError crashes when Discord returns non-array error payloads.
+- In dashboard OAuth authentication, ensure `session.guilds` is strictly validated and sanitized as an Array to prevent TypeError crashes when Discord returns non-array error payloads.
 - In dashboard forms with modals, query inputs using `[form="settingsForm"]` to capture inputs located outside the `<form>` DOM container.
 - In dashboard change detection, exclude search/helper inputs from `captureFormState()` and suppress change detection with an `isSwitchingGuild` guard during server switching transitions to prevent false-positive save bar displays.
 - Partition member XP and levels strictly per guild in SQLite via composite primary key `(guildId, userId)` rather than globally.
@@ -231,18 +169,3 @@ Prefer single-file or single-test runs during iteration (e.g. `npx vitest run te
 - Store member join invite attribution in `member_invites (guildId, userId, inviterId, inviteCode, timestamp)` to support member telemetry and audit tracking.
 - In dashboard modals, lock `document.body` background scrolling (`overflow = 'hidden'`) whenever any modal is displayed and restore on close.
 - When configuring parent command roles on the dashboard, cascade the role selection to all subcommands in the UI and allow individual subcommand overrides.
-
----
-
-## 12. How this file was built
-
-This boilerplate synthesizes:
-- Sean Donahoe's IJFW ("It Just F\*cking Works") principles: one install, working code, no ceremony.
-- Andrej Karpathy's observations on LLM coding pitfalls (the four principles: think-first, simplicity, surgical changes, goal-driven execution).
-- Boris Cherny's public Claude Code workflow (reactive pruning, keep it ~100 lines, only rules that fix real mistakes).
-- Anthropic's official Claude Code best practices (explore-plan-code-commit, verification loops, context as the scarce resource).
-- Community anti-sycophancy patterns (explicit banned phrases, direct-not-diplomatic).
-- The AGENTS.md open standard (cross-tool portability via symlinks).
-
-Read once. Edit sections 10 and 11 for your project. Prune the rest over time. This file gets better the more you use it.
-
