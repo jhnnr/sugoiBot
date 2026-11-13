@@ -51,28 +51,6 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: environment
-    attributes:
-      label: Runtime Environment
-      description: How are you running SugoiBot?
-      options:
-        - Node.js (npm start)
-        - Docker / Docker Compose
-        - Standalone Dashboard (npm run dashboard)
-        - Other
-    validations:
-      required: true
-
-  - type: input
-    id: version
-    attributes:
-      label: SugoiBot & Node.js Version
-      description: Specify the SugoiBot version (from package.json or Docker tag) and Node.js version if applicable.
-      placeholder: e.g. v1.3.0, Node.js v22.14.0
-    validations:
-      required: false
-
   - type: textarea
     id: logs
     attributes:
