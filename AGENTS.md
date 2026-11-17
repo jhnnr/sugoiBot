@@ -2,7 +2,7 @@
 
 Repository context, commands, architecture, and conventions for AI coding agents, following the [AGENTS.md](https://agents.md) open standard.
 
-For agent behavioral rules, workflow discipline, and accumulated session memory, see `GEMINI.md`.
+For agent behavioral rules, workflow discipline, and accumulated session memory, see `CLAUDE.md`.
 
 ---
 
