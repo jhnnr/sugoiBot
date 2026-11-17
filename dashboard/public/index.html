@@ -647,6 +647,158 @@
             color: var(--text-muted);
             font-size: 0.85rem;
         }
+        /* Settings Header Actions & Audit Log Viewer Styles */
+        .card-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background-color: var(--bg-primary);
+            color: var(--text-normal);
+            border: 1px solid var(--border);
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-action:hover {
+            border-color: var(--accent);
+            color: var(--text-heading);
+            background-color: rgba(88, 101, 242, 0.15);
+        }
+        .audit-toolbar {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .audit-toolbar select {
+            width: auto;
+            min-width: 190px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.88rem;
+        }
+        .audit-toolbar input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.88rem;
+        }
+        .audit-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            background-color: var(--bg-tertiary);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+        .audit-status-badge.connected {
+            color: var(--success);
+            border-color: rgba(35, 165, 90, 0.4);
+            background-color: rgba(35, 165, 90, 0.12);
+        }
+        .audit-logs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            max-height: 460px;
+            overflow-y: auto;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.85rem;
+        }
+        .audit-log-item {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 6px;
+            padding: 0.75rem 0.9rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .audit-log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .audit-log-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .audit-log-type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.18rem 0.5rem;
+            border-radius: 4px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-heading);
+        }
+        .audit-log-user {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.82rem;
+            color: var(--text-normal);
+            font-weight: 600;
+        }
+        .audit-log-user img {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        .audit-log-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .audit-log-desc {
+            font-size: 0.88rem;
+            color: var(--text-normal);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .audit-log-fields {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.2rem;
+        }
+        .audit-log-field {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.78rem;
+        }
+        .audit-log-field-name {
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-right: 0.3rem;
+        }
+        .audit-log-field-val {
+            color: var(--text-heading);
+        }
     </style>
 </head>
 <body>
@@ -751,8 +903,29 @@
         <!-- Authenticated View: Server Settings Card -->
         <section class="card" id="settingsCard" style="display: none;">
             <h2>
-                <span id="selectedServerTitle">Server Settings</span>
-                <span class="badge" id="selectedServerBadge">ID</span>
+                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                    <span id="selectedServerTitle">Server Settings</span>
+                    <span class="badge" id="selectedServerBadge">ID</span>
+                </div>
+                <div class="card-header-actions">
+                    <button type="button" class="btn-action" id="exportSettingsBtn" title="Export Server Configuration as JSON">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>Export JSON</span>
+                    </button>
+                    <button type="button" class="btn-action" id="importSettingsBtn" title="Import Server Configuration from JSON">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <span>Import JSON</span>
+                    </button>
+                    <input type="file" id="importSettingsFileInput" accept=".json,application/json" style="display: none;">
+                </div>
             </h2>
             <form id="settingsForm">
                 <h3 class="section-title">Active Modules</h3>
@@ -952,6 +1125,53 @@
 
                 <div class="alert" id="alertBox"></div>
             </form>
+        </section>
+
+        <!-- Authenticated View: Real-Time Server Audit Log Web Viewer -->
+        <section class="card" id="auditLogsCard" style="display: none;">
+            <h2>
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <span>Server Audit Logs</span>
+                </div>
+                <span class="audit-status-badge" id="auditStreamStatusBadge">
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
+                    <span id="auditStreamStatusText">Connecting...</span>
+                </span>
+            </h2>
+            <div class="audit-toolbar">
+                <select id="auditLogTypeFilter" aria-label="Filter Audit Logs by Event Type">
+                    <option value="all">All Event Types</option>
+                    <option value="log_events_member_join">Member Joins</option>
+                    <option value="log_events_member_leave">Member Leaves</option>
+                    <option value="log_events_member_update">Profile Updates</option>
+                    <option value="log_events_message_delete">Message Deletions</option>
+                    <option value="log_events_channels">Channel Events</option>
+                    <option value="log_events_roles">Role Events</option>
+                    <option value="log_events_moderation">Moderation Actions</option>
+                    <option value="log_events_voice">Voice Activity</option>
+                    <option value="log_events_commands">Command Usage</option>
+                    <option value="log_events_dashboard">Dashboard Changes</option>
+                </select>
+                <input type="text" id="auditLogSearchInput" placeholder="Search logs by user, action, or details..." autocomplete="off">
+                <button type="button" class="btn-icon" id="refreshAuditLogsBtn" title="Refresh Audit Logs" aria-label="Refresh Audit Logs">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <polyline points="1 20 1 14 7 14"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="audit-logs-list" id="auditLogsList">
+                <div style="text-align: center; color: var(--text-muted); padding: 1.5rem; font-size: 0.9rem;">
+                    Select a server to view recent audit logs.
+                </div>
+            </div>
         </section>
     </div>
 
@@ -1295,6 +1515,7 @@
         const serversGrid = document.getElementById('serversGrid');
         const serverCountBadge = document.getElementById('serverCountBadge');
         const settingsCard = document.getElementById('settingsCard');
+        const auditLogsCard = document.getElementById('auditLogsCard');
         const selectedServerTitle = document.getElementById('selectedServerTitle');
         const selectedServerBadge = document.getElementById('selectedServerBadge');
         const alertBox = document.getElementById('alertBox');
@@ -1303,11 +1524,14 @@
         const resetBtn = document.getElementById('resetBtn');
 
         let currentGuildId = null;
+        let currentGuildName = '';
         let originalFormState = {};
         let currentRoleRewards = {};
         let currentCommandRoles = {};
         let allCommandsCache = [];
         let guildRolesCache = [];
+        let auditLogEventSource = null;
+        let auditLogsCache = [];
 
         async function loadAllCommands() {
             try {
@@ -1738,6 +1962,7 @@
         function closeModal(modalId) {
             const modal = document.getElementById(modalId);
             if (modal) modal.style.display = 'none';
+            updateBodyScrollLock();
             checkFormChanges();
         }
 
@@ -1746,6 +1971,7 @@
             b.addEventListener('click', (e) => {
                 if (e.target === b) {
                     b.style.display = 'none';
+                    updateBodyScrollLock();
                     checkFormChanges();
                 }
             });
@@ -1791,9 +2017,11 @@
                 confirmBtn.className = isDestructive ? 'btn-danger' : 'btn-save-floating';
 
                 modal.style.display = 'flex';
+                updateBodyScrollLock();
 
                 const cleanup = () => {
                     modal.style.display = 'none';
+                    updateBodyScrollLock();
                     confirmBtn.removeEventListener('click', onConfirm);
                     cancelBtn.removeEventListener('click', onCancel);
                     closeBtn.removeEventListener('click', onCancel);
@@ -1868,7 +2096,7 @@
                 const id = el.id || el.name;
                 if (!id) return;
                 // Exclude search inputs, temporary creation inputs, and auxiliary pickers
-                if (id === 'log_channel_search' || id === 'xp_channel_search' || id === 'new_reward_level' || id === 'new_reward_role_select' || id === 'gamerole_color_picker' || id.startsWith('cmd_role_search_') || el.classList.contains('cmd-role-search-input')) return;
+                if (id === 'log_channel_search' || id === 'xp_channel_search' || id === 'new_reward_level' || id === 'new_reward_role_select' || id === 'gamerole_color_picker' || id === 'importSettingsFileInput' || id === 'auditLogTypeFilter' || id === 'auditLogSearchInput' || id.startsWith('cmd_role_search_') || el.classList.contains('cmd-role-search-input')) return;
                 state[id] = el.type === 'checkbox' ? el.checked : el.value;
             });
             state['role_rewards'] = JSON.stringify(currentRoleRewards);
@@ -1988,10 +2216,12 @@
         }
 
         function renderLoggedOut() {
+            disconnectAuditLogStream();
             authSection.innerHTML = '';
             statsGrid.style.display = 'none';
             serversSection.style.display = 'none';
             settingsCard.style.display = 'none';
+            if (auditLogsCard) auditLogsCard.style.display = 'none';
             floatingSaveBar.classList.remove('visible');
             landingLoginCard.style.display = 'flex';
         }
@@ -2004,6 +2234,7 @@
                 const guilds = data.guilds || [];
 
                 serverCountBadge.textContent = `${guilds.length} Servers`;
+                document.getElementById('guilds').textContent = guilds.filter(g => g.botPresent).length;
 
                 if (guilds.length === 0) {
                     serversGrid.innerHTML = `
@@ -2291,11 +2522,303 @@
             }
         }
 
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function stripLeadingEmojis(str) {
+            return String(str || '').replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\s]+/u, '').trim();
+        }
+
+        function getAuditEventMeta(eventType) {
+            const map = {
+                log_events_member_join: {
+                    label: 'Member Join',
+                    color: '#23a55a',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>'
+                },
+                log_events_member_leave: {
+                    label: 'Member Leave',
+                    color: '#f23f43',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></svg>'
+                },
+                log_events_member_update: {
+                    label: 'Profile Update',
+                    color: '#5865f2',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>'
+                },
+                log_events_message_delete: {
+                    label: 'Message Deleted',
+                    color: '#f23f43',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+                },
+                log_events_channels: {
+                    label: 'Channel Event',
+                    color: '#5865f2',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>'
+                },
+                log_events_roles: {
+                    label: 'Role Event',
+                    color: '#fee75c',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
+                },
+                log_events_moderation: {
+                    label: 'Moderation',
+                    color: '#f23f43',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'
+                },
+                log_events_voice: {
+                    label: 'Voice Activity',
+                    color: '#23a55a',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>'
+                },
+                log_events_commands: {
+                    label: 'Command Used',
+                    color: '#5865f2',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>'
+                },
+                log_events_dashboard: {
+                    label: 'Dashboard',
+                    color: '#5865f2',
+                    svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>'
+                }
+            };
+            return map[eventType] || {
+                label: eventType || 'Audit Log',
+                color: '#5865f2',
+                svg: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+            };
+        }
+
+        function renderAuditLogs() {
+            const listEl = document.getElementById('auditLogsList');
+            if (!listEl) return;
+
+            const filterType = document.getElementById('auditLogTypeFilter')?.value || 'all';
+            const searchQuery = (document.getElementById('auditLogSearchInput')?.value || '').trim().toLowerCase();
+
+            const filtered = auditLogsCache.filter(entry => {
+                if (filterType !== 'all' && entry.eventType !== filterType) return false;
+                if (searchQuery) {
+                    const fieldsStr = Array.isArray(entry.fields)
+                        ? entry.fields.map(f => `${f.name || ''} ${f.value || ''}`).join(' ')
+                        : '';
+                    const haystack = `${entry.title || ''} ${entry.description || ''} ${entry.username || ''} ${entry.eventType || ''} ${fieldsStr}`.toLowerCase();
+                    if (!haystack.includes(searchQuery)) return false;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `
+                    <div style="text-align: center; color: var(--text-muted); padding: 1.5rem; font-size: 0.9rem;">
+                        No audit log events matching your current filters.
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(entry => {
+                const meta = getAuditEventMeta(entry.eventType);
+                const borderHex = typeof entry.color === 'number'
+                    ? `#${entry.color.toString(16).padStart(6, '0')}`
+                    : meta.color;
+                const cleanDesc = stripLeadingEmojis(entry.description || '');
+                const cleanTitle = stripLeadingEmojis(entry.title || '');
+                const timeStr = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
+                const fields = Array.isArray(entry.fields) ? entry.fields : [];
+
+                return `
+                    <div class="audit-log-item" style="border-left-color: ${borderHex};">
+                        <div class="audit-log-header">
+                            <div class="audit-log-meta">
+                                <span class="audit-log-type-badge" style="color: ${meta.color};">
+                                    ${meta.svg}
+                                    <span>${escapeHtml(meta.label)}</span>
+                                </span>
+                                <span class="audit-log-user">
+                                    ${entry.userAvatar ? `<img src="${escapeHtml(entry.userAvatar)}" alt="">` : ''}
+                                    <span>${escapeHtml(entry.username || 'System')}</span>
+                                </span>
+                                ${cleanTitle ? `<strong style="color: var(--text-heading); font-size: 0.85rem;">${escapeHtml(cleanTitle)}</strong>` : ''}
+                            </div>
+                            <span class="audit-log-time">${escapeHtml(timeStr)}</span>
+                        </div>
+                        <div class="audit-log-desc">${escapeHtml(cleanDesc)}</div>
+                        ${fields.length > 0 ? `
+                            <div class="audit-log-fields">
+                                ${fields.map(f => `
+                                    <div class="audit-log-field">
+                                        <span class="audit-log-field-name">${escapeHtml(stripLeadingEmojis(f.name || ''))}:</span>
+                                        <span class="audit-log-field-val">${escapeHtml(stripLeadingEmojis(f.value || ''))}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadAuditLogs(guildId) {
+            if (!guildId) return;
+            try {
+                const res = await fetch(`/api/guilds/${guildId}/audit-logs?limit=50`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                auditLogsCache = Array.isArray(data.logs) ? data.logs : [];
+                renderAuditLogs();
+            } catch {
+                const listEl = document.getElementById('auditLogsList');
+                if (listEl) {
+                    listEl.innerHTML = '<div style="text-align: center; color: var(--danger); padding: 1rem;">Failed to load server audit logs.</div>';
+                }
+            }
+        }
+
+        function setAuditStreamBadge(isConnected, labelText) {
+            const badge = document.getElementById('auditStreamStatusBadge');
+            const textEl = document.getElementById('auditStreamStatusText');
+            if (!badge || !textEl) return;
+            badge.classList.toggle('connected', Boolean(isConnected));
+            textEl.textContent = labelText;
+        }
+
+        function disconnectAuditLogStream() {
+            if (auditLogEventSource) {
+                try {
+                    auditLogEventSource.close();
+                } catch {}
+                auditLogEventSource = null;
+            }
+            setAuditStreamBadge(false, 'Disconnected');
+        }
+
+        function connectAuditLogStream(guildId) {
+            disconnectAuditLogStream();
+            if (!guildId || typeof EventSource === 'undefined') return;
+
+            setAuditStreamBadge(false, 'Connecting...');
+            const es = new EventSource(`/api/guilds/${guildId}/audit-logs/stream`);
+            auditLogEventSource = es;
+
+            es.addEventListener('connected', () => {
+                setAuditStreamBadge(true, 'Live Stream');
+            });
+
+            es.onopen = () => {
+                setAuditStreamBadge(true, 'Live Stream');
+            };
+
+            es.onmessage = (event) => {
+                if (!event.data) return;
+                try {
+                    const entry = JSON.parse(event.data);
+                    if (entry && entry.guildId === currentGuildId) {
+                        auditLogsCache = [entry, ...auditLogsCache.filter(x => x.id !== entry.id)].slice(0, 100);
+                        renderAuditLogs();
+                    }
+                } catch {}
+            };
+
+            es.onerror = () => {
+                setAuditStreamBadge(false, 'Reconnecting...');
+            };
+        }
+
+        async function exportServerSettings() {
+            if (!currentGuildId) return;
+            try {
+                const res = await fetch(`/api/guilds/${currentGuildId}/settings/export`);
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    showAlert(err.error || 'Failed to export server settings', false);
+                    return;
+                }
+                const data = await res.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `sugoibot-settings-${currentGuildId}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showAlert('Server configuration exported as JSON!', true);
+            } catch {
+                showAlert('Network error while exporting server settings', false);
+            }
+        }
+
+        async function importServerSettings(file) {
+            if (!currentGuildId || !file) return;
+            let parsed;
+            try {
+                const text = await file.text();
+                parsed = JSON.parse(text);
+            } catch {
+                showAlert('Selected file is not valid JSON.', false);
+                return;
+            }
+
+            const confirmed = await showConfirmModal({
+                title: 'Import Server Settings',
+                message: `Are you sure you want to restore configuration from <strong>${escapeHtml(file.name)}</strong> into <strong>${escapeHtml(currentGuildName || currentGuildId)}</strong>? This will overwrite current server settings.`,
+                confirmText: 'Import Settings',
+                isDestructive: false
+            });
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`/api/guilds/${currentGuildId}/settings/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(parsed)
+                });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    showAlert('Server settings imported and restored successfully!', true);
+                    await selectGuild(currentGuildId, currentGuildName || 'Server');
+                } else {
+                    showAlert(result.error || 'Failed to import server settings', false);
+                }
+            } catch {
+                showAlert('Network error while importing server settings', false);
+            }
+        }
+
+        document.getElementById('exportSettingsBtn').addEventListener('click', exportServerSettings);
+        document.getElementById('importSettingsBtn').addEventListener('click', () => {
+            const fileInput = document.getElementById('importSettingsFileInput');
+            if (fileInput) {
+                fileInput.value = '';
+                fileInput.click();
+            }
+        });
+        document.getElementById('importSettingsFileInput').addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                importServerSettings(file);
+            }
+        });
+        document.getElementById('auditLogTypeFilter').addEventListener('change', renderAuditLogs);
+        document.getElementById('auditLogSearchInput').addEventListener('input', renderAuditLogs);
+        document.getElementById('refreshAuditLogsBtn').addEventListener('click', () => {
+            if (currentGuildId) loadAuditLogs(currentGuildId);
+        });
+
         async function selectGuild(guildId, guildName) {
             isSwitchingGuild = true;
             floatingSaveBar.classList.remove('visible');
             originalFormState = {};
             currentGuildId = guildId;
+            currentGuildName = guildName || '';
 
             document.querySelectorAll('.server-item').forEach(el => {
                 el.classList.toggle('selected', el.getAttribute('data-guild-id') === guildId);
@@ -2304,6 +2827,9 @@
             selectedServerTitle.textContent = `${guildName} Settings`;
             selectedServerBadge.textContent = `ID: ${guildId}`;
             settingsCard.style.display = 'block';
+            if (auditLogsCard) auditLogsCard.style.display = 'block';
+            loadAuditLogs(guildId);
+            connectAuditLogStream(guildId);
 
             // Set loading state on comboboxes immediately while fetching
             logChannelCombobox.setLoading();
