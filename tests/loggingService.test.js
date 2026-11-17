@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loggingService } from '../lib/bot/loggingService.js';
+import { loggingService, resolveAuditMentions } from '../lib/bot/loggingService.js';
 import { SettingsManager } from '../lib/settings.js';
+import db from '../lib/database.js';
 
 vi.mock('../lib/settings.js', () => ({
     SettingsManager: {
@@ -157,5 +158,148 @@ describe('Logging Service', () => {
         const searched = loggingService.getAuditLogs(auditGuildId, { search: 'announcements' });
         expect(searched.length).toBe(1);
         expect(searched[0].eventType).toBe('log_events_channels');
+    });
+
+    it('should resolve <@userId>, <@!userId>, <#channelId>, and <@&roleId> mentions across passed user, caches, and historical SQLite audit_logs', () => {
+        const mentionGuildId = 'g_mention_resolve_' + Date.now();
+
+        // Seed a historical SQLite row so userId 517108999527727126 is known in audit_logs as sugoi.js
+        loggingService.recordAuditLog(mentionGuildId, {
+            title: 'Voice Activity',
+            description: 'Historical voice join',
+            eventType: 'log_events_voice',
+            user: { id: '517108999527727126', username: 'sugoi.js#0' }
+        });
+
+        const fakeGuild = {
+            id: mentionGuildId,
+            name: 'Mention Resolution Server',
+            client: {
+                user: { id: '1562149253504049192', username: 'sugoiBot' },
+                users: {
+                    cache: new Map([
+                        ['777777777777777777', { id: '777777777777777777', username: 'CachedGlobalUser' }]
+                    ])
+                }
+            },
+            members: {
+                cache: new Map([
+                    ['888888888888888888', { id: '888888888888888888', user: { id: '888888888888888888', username: 'GuildMemberUser' } }]
+                ])
+            },
+            channels: {
+                cache: new Map([
+                    ['444444444444444444', { id: '444444444444444444', name: 'mod-log-room' }]
+                ])
+            },
+            roles: {
+                cache: new Map([
+                    ['555555555555555555', { id: '555555555555555555', name: 'VoiceModerator' }]
+                ])
+            }
+        };
+
+        const rawDesc = '<@517108999527727126> was moved from voice channel **➕ Join to Create** to **dota o ako** by <@1562149253504049192> in <#444444444444444444> with <@&555555555555555555> and <@!888888888888888888> / <@777777777777777777> / <@!999999999999999999>';
+        const resolved = resolveAuditMentions(rawDesc, {
+            guild: fakeGuild,
+            client: fakeGuild.client,
+            user: { id: '999999999999999999', tag: 'PassedActor#0' }
+        });
+
+        expect(resolved).toBe(
+            '@sugoi.js was moved from voice channel **➕ Join to Create** to **dota o ako** by @sugoiBot in #mod-log-room with @VoiceModerator and @GuildMemberUser / @CachedGlobalUser / @PassedActor'
+        );
+
+        // Also verify historical rows containing raw <@id> in SQLite are dynamically resolved on getAuditLogs()
+        db.prepare(`
+            INSERT INTO audit_logs (guildId, eventType, title, description, color, userId, username, userTag, fields, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            mentionGuildId,
+            'log_events_voice',
+            'Voice Activity',
+            '<@517108999527727126> left voice channel **dota o ako** (handled by <@1562149253504049192>)',
+            0xF23F43,
+            '517108999527727126',
+            'sugoi.js',
+            'sugoi.js',
+            '[]',
+            Date.now() + 100
+        );
+
+        const logs = loggingService.getAuditLogs(mentionGuildId, {
+            limit: 5,
+            guild: fakeGuild,
+            client: fakeGuild.client
+        });
+        expect(logs[0].description).toBe('@sugoi.js left voice channel **dota o ako** (handled by @sugoiBot)');
+        expect(logs[0].username).toBe('sugoi.js');
+        expect(logs[0].userTag).toBe('sugoi.js');
+    });
+
+    it('should preserve native <@id> mentions in Discord channel embeds while storing resolved @username mentions in dashboard audit_logs', async () => {
+        const dualGuildId = 'g_dual_embed_' + Date.now();
+        SettingsManager.getGuildJson.mockReturnValue(true);
+        SettingsManager.getGuild.mockReturnValue('123456789012345678');
+
+        const fetchUserMock = vi.fn().mockImplementation(async (id) => {
+            if (id === '1562149253504049192') {
+                return { id: '1562149253504049192', username: 'sugoiBot' };
+            }
+            return null;
+        });
+
+        const guildWithClient = {
+            id: dualGuildId,
+            name: 'Dual Format Guild',
+            channels: {
+                cache: new Map([['123456789012345678', mockChannel]]),
+                fetch: vi.fn().mockResolvedValue(mockChannel)
+            },
+            members: {
+                cache: new Map()
+            },
+            roles: {
+                cache: new Map([['333333333333333333', { id: '333333333333333333', name: 'Staff' }]])
+            },
+            client: {
+                user: { id: '900000000000000001', username: 'MainBot' },
+                users: {
+                    cache: new Map(),
+                    fetch: fetchUserMock
+                }
+            }
+        };
+
+        const rawVoiceMoveDescription = '<@517108999527727126> was moved from voice channel **➕ Join to Create** to **dota o ako** by <@1562149253504049192>';
+
+        await loggingService.log(guildWithClient, {
+            title: 'Voice Activity',
+            description: rawVoiceMoveDescription,
+            eventType: 'log_events_voice',
+            color: 0xFEE75C,
+            user: {
+                id: '517108999527727126',
+                username: 'sugoi.js',
+                displayAvatarURL: () => 'https://cdn.discordapp.com/avatars/sugoi.png'
+            }
+        });
+
+        // 1. Uncached user <@1562149253504049192> was prefetched via guild.client.users.fetch
+        expect(fetchUserMock).toHaveBeenCalledWith('1562149253504049192');
+
+        // 2. Discord embed sent to logChannel.send preserves native <@id> mentions for Discord client
+        expect(mockSend).toHaveBeenCalledTimes(1);
+        const sentEmbed = mockSend.mock.calls[0][0].embeds[0];
+        expect(sentEmbed.data.description).toBe(rawVoiceMoveDescription);
+
+        // 3. Dashboard audit_logs entry has resolved @username mentions
+        const savedLogs = loggingService.getAuditLogs(dualGuildId, { limit: 5 });
+        expect(savedLogs.length).toBe(1);
+        expect(savedLogs[0].description).toBe(
+            '@sugoi.js was moved from voice channel **➕ Join to Create** to **dota o ako** by @sugoiBot'
+        );
+        expect(savedLogs[0].username).toBe('sugoi.js');
+        expect(savedLogs[0].userTag).toBe('sugoi.js');
     });
 });

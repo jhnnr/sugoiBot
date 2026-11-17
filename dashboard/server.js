@@ -646,7 +646,14 @@ app.get('/api/guilds/:guildId/audit-logs', (req, res) => {
             ? req.query.search.trim()
             : null;
 
-        const logs = loggingService.getAuditLogs(guildId, { limit, eventType, search });
+        const guild = discordClient?.guilds?.cache?.get(guildId) || null;
+        const logs = loggingService.getAuditLogs(guildId, {
+            limit,
+            eventType,
+            search,
+            guild,
+            client: discordClient
+        });
         res.json({ guildId, logs });
     } catch (error) {
         res.status(500).json({ error: 'Failed to retrieve audit logs' });
@@ -676,7 +683,16 @@ app.get('/api/guilds/:guildId/audit-logs/stream', (req, res) => {
 
     const unsubscribe = loggingService.subscribe(guildId, (entry) => {
         try {
-            res.write(`data: ${JSON.stringify(entry)}\n\n`);
+            const guild = discordClient?.guilds?.cache?.get(guildId) || null;
+            const resolvedEntry = {
+                ...entry,
+                description: loggingService.resolveAuditMentions(entry.description, {
+                    guild,
+                    client: discordClient,
+                    user: entry.userId ? { id: entry.userId, username: entry.username, tag: entry.userTag || entry.username } : null
+                })
+            };
+            res.write(`data: ${JSON.stringify(resolvedEntry)}\n\n`);
         } catch {}
     });
 

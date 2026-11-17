@@ -447,6 +447,15 @@ window.__dashboardTestApi = {
     refreshGameRoleModalData,
     logChannelCombobox,
     xpChannelCombobox,
+    stripEmojis,
+    cleanAuditUserTag,
+    buildAuditUserMap,
+    resolveClientAuditMentions,
+    formatAuditMarkdown,
+    formatAuditDescription,
+    renderAuditLogs,
+    appendAuditLogEntry,
+    loadAuditLogs,
     getState: () => ({
         currentGuildId,
         originalFormState,
@@ -454,7 +463,8 @@ window.__dashboardTestApi = {
         hasUserEditedForm,
         isSwitchingGuild,
         currentRoleRewards,
-        currentCommandRoles
+        currentCommandRoles,
+        auditLogsCache
     })
 };
 `;
@@ -1311,6 +1321,203 @@ describe('Dashboard API', () => {
             api.closeModal('gameroleModal');
             expect(api.isFormDirty()).toBe(false);
             expect(saveBar.classList.contains('visible')).toBe(false);
+        });
+
+        it('GET /api/guilds/:guildId/audit-logs resolves <@userId>, <#channelId>, and <@&roleId> mentions via discordClient cache and historical SQLite audit_logs', async () => {
+            const voiceGuildId = 'voice_audit_guild_' + Date.now();
+
+            setDiscordClient({
+                user: { id: '1562149253504049192', username: 'sugoiBot' },
+                users: {
+                    cache: new Map([
+                        ['1562149253504049192', { id: '1562149253504049192', username: 'sugoiBot' }]
+                    ])
+                },
+                guilds: {
+                    cache: new Map([
+                        [
+                            voiceGuildId,
+                            {
+                                id: voiceGuildId,
+                                name: 'Voice Audit Server',
+                                members: {
+                                    cache: new Map([
+                                        ['517108999527727126', { id: '517108999527727126', user: { id: '517108999527727126', username: 'sugoi.js' } }]
+                                    ])
+                                },
+                                channels: {
+                                    cache: new Map([
+                                        ['700000000000000001', { id: '700000000000000001', name: 'voice-lobby', type: 2 }]
+                                    ])
+                                },
+                                roles: {
+                                    cache: new Map([
+                                        ['800000000000000002', { id: '800000000000000002', name: 'DJ' }]
+                                    ])
+                                }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            const loginRes = await fetch(`${baseUrl}/api/auth/dev-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user: { id: 'voice_admin', username: 'VoiceAdmin' },
+                    guilds: [{ id: voiceGuildId, name: 'Voice Audit Server', owner: true }]
+                })
+            });
+            const cookie = loginRes.headers.get('set-cookie');
+
+            const baseTs = Date.now();
+            // Insert historical raw-mention rows into SQLite as well as new recordAuditLog entries covering all 5 user-reported lines
+            loggingService.recordAuditLog(voiceGuildId, {
+                title: 'Voice Activity',
+                description: '<@517108999527727126> joined voice channel **➕ Join to Create**',
+                eventType: 'log_events_voice',
+                user: { id: '517108999527727126', username: 'sugoi.js' },
+                timestamp: baseTs + 1
+            });
+            loggingService.recordAuditLog(voiceGuildId, {
+                title: 'Channel Event',
+                description: 'Voice channel created: **dota o ako**',
+                eventType: 'log_events_channels',
+                user: { id: '1562149253504049192', username: 'sugoiBot' },
+                timestamp: baseTs + 2
+            });
+            // Simulate a pre-existing historical row in SQLite that stored raw <@id>, <#id>, and <@&id> mentions
+            db.prepare(`
+                INSERT INTO audit_logs (guildId, eventType, title, description, color, userId, username, userTag, fields, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+                voiceGuildId,
+                'log_events_voice',
+                'Voice Activity',
+                '<@517108999527727126> was moved from voice channel **➕ Join to Create** to **dota o ako** by <@1562149253504049192> (<#700000000000000001> / <@&800000000000000002>)',
+                0xFEE75C,
+                '517108999527727126',
+                'sugoi.js',
+                'sugoi.js',
+                '[]',
+                baseTs + 3
+            );
+            loggingService.recordAuditLog(voiceGuildId, {
+                title: 'Voice Activity',
+                description: '<@517108999527727126> left voice channel **dota o ako**',
+                eventType: 'log_events_voice',
+                user: { id: '517108999527727126', username: 'sugoi.js' },
+                timestamp: baseTs + 4
+            });
+            loggingService.recordAuditLog(voiceGuildId, {
+                title: 'Channel Event',
+                description: 'Voice channel deleted: **dota o ako**',
+                eventType: 'log_events_channels',
+                user: { id: '1562149253504049192', username: 'sugoiBot' },
+                timestamp: baseTs + 5
+            });
+
+            const res = await fetch(`${baseUrl}/api/guilds/${voiceGuildId}/audit-logs?limit=10`, {
+                headers: { Cookie: cookie }
+            });
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.logs.length).toBe(5);
+
+            const descriptions = data.logs.map(l => l.description);
+            expect(descriptions).toEqual([
+                'Voice channel deleted: **dota o ako**',
+                '@sugoi.js left voice channel **dota o ako**',
+                '@sugoi.js was moved from voice channel **➕ Join to Create** to **dota o ako** by @sugoiBot (#voice-lobby / @DJ)',
+                'Voice channel created: **dota o ako**',
+                '@sugoi.js joined voice channel **➕ Join to Create**'
+            ]);
+        });
+
+        it('dashboard frontend audit log renderer resolves fallback mentions, strips inline emojis, and formats **bold** and `code` into clean HTML', async () => {
+            const { document, api } = await setupAuthenticatedDashboard();
+            const listEl = document.getElementById('auditLogsList');
+
+            const sampleLogs = [
+                {
+                    id: 505,
+                    guildId: api.getState().currentGuildId,
+                    eventType: 'log_events_channels',
+                    title: 'Channel Event',
+                    description: 'Voice channel deleted: **dota o ako**',
+                    userId: '1562149253504049192',
+                    username: 'sugoiBot',
+                    userTag: 'sugoiBot',
+                    timestamp: Date.now()
+                },
+                {
+                    id: 504,
+                    guildId: api.getState().currentGuildId,
+                    eventType: 'log_events_voice',
+                    title: '🔊 Voice Activity',
+                    description: '<@517108999527727126> left voice channel **dota o ako**',
+                    userId: '517108999527727126',
+                    username: 'sugoi.js',
+                    userTag: 'sugoi.js#0',
+                    timestamp: Date.now() - 1000
+                },
+                {
+                    id: 503,
+                    guildId: api.getState().currentGuildId,
+                    eventType: 'log_events_voice',
+                    title: 'Voice Activity',
+                    description: '<@517108999527727126> was moved from voice channel **➕ Join to Create** to **dota o ako** by <@1562149253504049192> with <@&333333333333333333> using `/voice move`',
+                    userId: '517108999527727126',
+                    username: 'sugoi.js',
+                    userTag: 'sugoi.js',
+                    timestamp: Date.now() - 2000
+                },
+                {
+                    id: 502,
+                    guildId: api.getState().currentGuildId,
+                    eventType: 'log_events_channels',
+                    title: 'Channel Event',
+                    description: 'Voice channel created: **dota o ako**',
+                    userId: '1562149253504049192',
+                    username: 'sugoiBot',
+                    userTag: 'sugoiBot',
+                    timestamp: Date.now() - 3000
+                },
+                {
+                    id: 501,
+                    guildId: api.getState().currentGuildId,
+                    eventType: 'log_events_voice',
+                    title: 'Voice Activity',
+                    description: '<@!517108999527727126> joined voice channel **➕ Join to Create** <script>alert(1)</script>',
+                    userId: '517108999527727126',
+                    username: 'sugoi.js',
+                    userTag: 'sugoi.js',
+                    timestamp: Date.now() - 4000
+                }
+            ];
+
+            api.renderAuditLogs(sampleLogs);
+
+            const html = listEl.innerHTML;
+            // 1. No raw <@id> or <@&id> mentions remain
+            expect(html).not.toContain('<@517108999527727126>');
+            expect(html).not.toContain('<@!517108999527727126>');
+            expect(html).not.toContain('<@1562149253504049192>');
+            expect(html).not.toContain('<@&333333333333333333>');
+
+            // 2. Inline and leading emojis (➕, 🔊) are completely stripped
+            expect(html).not.toContain('➕');
+            expect(html).not.toContain('🔊');
+            expect(/[\p{Extended_Pictographic}\p{Emoji_Presentation}]/u.test(html)).toBe(false);
+
+            // 3. Markdown **bold** and `code` are converted to <strong> and <code> with no raw ** asterisks
+            expect(html).not.toContain('**');
+            expect(html).toContain('Voice channel deleted: <strong>dota o ako</strong>');
+            expect(html).toContain('@sugoi.js left voice channel <strong>dota o ako</strong>');
+            expect(html).toContain('@sugoi.js was moved from voice channel <strong>Join to Create</strong> to <strong>dota o ako</strong> by @sugoiBot with @Moderator using <code>/voice move</code>');
+            expect(html).toContain('Voice channel created: <strong>dota o ako</strong>');
+            expect(html).toContain('@sugoi.js joined voice channel <strong>Join to Create</strong> &lt;script&gt;alert(1)&lt;/script&gt;');
         });
     });
 });

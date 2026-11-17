@@ -778,6 +778,19 @@
             line-height: 1.4;
             word-break: break-word;
         }
+        .audit-log-desc strong {
+            color: var(--text-heading);
+            font-weight: 600;
+        }
+        .audit-log-desc code {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.1rem 0.35rem;
+            font-size: 0.82rem;
+            font-family: monospace;
+            color: var(--text-heading);
+        }
         .audit-log-fields {
             display: flex;
             flex-wrap: wrap;
@@ -2638,8 +2651,73 @@
                 .replace(/'/g, '&#39;');
         }
 
-        function stripLeadingEmojis(str) {
-            return String(str || '').replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\s]+/u, '').trim();
+        function stripEmojis(str) {
+            return String(str || '')
+                .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]+/gu, '')
+                .replace(/\*\*([^*]*)\*\*/g, (_, inner) => {
+                    const cleaned = inner.replace(/[ \t]{2,}/g, ' ').trim();
+                    return cleaned ? `**${cleaned}**` : '';
+                })
+                .replace(/[ \t]{2,}/g, ' ')
+                .trim();
+        }
+        const stripLeadingEmojis = stripEmojis;
+
+        function cleanAuditUserTag(rawTag) {
+            if (!rawTag || typeof rawTag !== 'string') return '';
+            const cleaned = rawTag.trim().replace(/^@+/, '').replace(/#0$/, '').trim();
+            return (cleaned && cleaned !== 'System') ? cleaned : '';
+        }
+
+        function buildAuditUserMap(logs = auditLogsCache) {
+            const userMap = new Map();
+            if (!Array.isArray(logs)) return userMap;
+            for (const item of logs) {
+                if (!item || !item.userId) continue;
+                const tag = cleanAuditUserTag(item.userTag) || cleanAuditUserTag(item.username);
+                if (tag && !userMap.has(String(item.userId))) {
+                    userMap.set(String(item.userId), tag);
+                }
+            }
+            return userMap;
+        }
+
+        function resolveClientAuditMentions(text, entry = null, logsOrMap = auditLogsCache) {
+            let result = String(text ?? '');
+            if (!result) return '';
+
+            const userMap = logsOrMap instanceof Map ? logsOrMap : buildAuditUserMap(logsOrMap);
+            const entryUserId = entry?.userId ? String(entry.userId) : '';
+            const entryTag = cleanAuditUserTag(entry?.userTag) || cleanAuditUserTag(entry?.username);
+
+            result = result.replace(/<@!?(\d+)>/g, (match, id) => {
+                if (entryUserId && entryUserId === String(id) && entryTag) {
+                    return `@${entryTag}`;
+                }
+                const knownTag = userMap.get(String(id));
+                return knownTag ? `@${knownTag}` : match;
+            });
+
+            result = result.replace(/<@&(\d+)>/g, (match, id) => {
+                const role = Array.isArray(guildRolesCache)
+                    ? guildRolesCache.find(r => String(r.id) === String(id))
+                    : null;
+                return role?.name ? `@${String(role.name).replace(/^@+/, '')}` : match;
+            });
+
+            return result;
+        }
+
+        function formatAuditMarkdown(str) {
+            return escapeHtml(str)
+                .replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/`([^`]+?)`/g, '<code>$1</code>');
+        }
+
+        function formatAuditDescription(description, entry = null, logsOrMap = auditLogsCache) {
+            const resolved = resolveClientAuditMentions(description || '', entry, logsOrMap);
+            const stripped = stripEmojis(resolved);
+            return formatAuditMarkdown(stripped);
         }
 
         function getAuditEventMeta(eventType) {
@@ -2702,20 +2780,25 @@
             };
         }
 
-        function renderAuditLogs() {
+        function renderAuditLogs(logsArg) {
+            if (Array.isArray(logsArg)) {
+                auditLogsCache = logsArg;
+            }
             const listEl = document.getElementById('auditLogsList');
             if (!listEl) return;
 
             const filterType = document.getElementById('auditLogTypeFilter')?.value || 'all';
             const searchQuery = (document.getElementById('auditLogSearchInput')?.value || '').trim().toLowerCase();
+            const userMap = buildAuditUserMap(auditLogsCache);
 
             const filtered = auditLogsCache.filter(entry => {
                 if (filterType !== 'all' && entry.eventType !== filterType) return false;
                 if (searchQuery) {
+                    const resolvedDesc = stripEmojis(resolveClientAuditMentions(entry.description || '', entry, userMap));
                     const fieldsStr = Array.isArray(entry.fields)
-                        ? entry.fields.map(f => `${f.name || ''} ${f.value || ''}`).join(' ')
+                        ? entry.fields.map(f => `${stripEmojis(f.name || '')} ${stripEmojis(resolveClientAuditMentions(f.value || '', entry, userMap))}`).join(' ')
                         : '';
-                    const haystack = `${entry.title || ''} ${entry.description || ''} ${entry.username || ''} ${entry.eventType || ''} ${fieldsStr}`.toLowerCase();
+                    const haystack = `${stripEmojis(entry.title || '')} ${resolvedDesc} ${entry.username || ''} ${entry.userTag || ''} ${entry.eventType || ''} ${fieldsStr}`.toLowerCase();
                     if (!haystack.includes(searchQuery)) return false;
                 }
                 return true;
@@ -2735,8 +2818,9 @@
                 const borderHex = typeof entry.color === 'number'
                     ? `#${entry.color.toString(16).padStart(6, '0')}`
                     : meta.color;
-                const cleanDesc = stripLeadingEmojis(entry.description || '');
-                const cleanTitle = stripLeadingEmojis(entry.title || '');
+                const formattedDescHtml = formatAuditDescription(entry.description || '', entry, userMap);
+                const cleanTitle = stripEmojis(entry.title || '');
+                const displayUser = stripEmojis(entry.username || entry.userTag || 'System') || 'System';
                 const timeStr = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
                 const fields = Array.isArray(entry.fields) ? entry.fields : [];
 
@@ -2750,19 +2834,19 @@
                                 </span>
                                 <span class="audit-log-user">
                                     ${entry.userAvatar ? `<img src="${escapeHtml(entry.userAvatar)}" alt="">` : ''}
-                                    <span>${escapeHtml(entry.username || 'System')}</span>
+                                    <span>${escapeHtml(displayUser)}</span>
                                 </span>
                                 ${cleanTitle ? `<strong style="color: var(--text-heading); font-size: 0.85rem;">${escapeHtml(cleanTitle)}</strong>` : ''}
                             </div>
                             <span class="audit-log-time">${escapeHtml(timeStr)}</span>
                         </div>
-                        <div class="audit-log-desc">${escapeHtml(cleanDesc)}</div>
+                        <div class="audit-log-desc">${formattedDescHtml}</div>
                         ${fields.length > 0 ? `
                             <div class="audit-log-fields">
                                 ${fields.map(f => `
                                     <div class="audit-log-field">
-                                        <span class="audit-log-field-name">${escapeHtml(stripLeadingEmojis(f.name || ''))}:</span>
-                                        <span class="audit-log-field-val">${escapeHtml(stripLeadingEmojis(f.value || ''))}</span>
+                                        <span class="audit-log-field-name">${escapeHtml(stripEmojis(f.name || ''))}:</span>
+                                        <span class="audit-log-field-val">${formatAuditDescription(f.value || '', entry, userMap)}</span>
                                     </div>
                                 `).join('')}
                             </div>
@@ -2770,6 +2854,13 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function appendAuditLogEntry(entry) {
+            if (!entry) return;
+            if (currentGuildId && entry.guildId && String(entry.guildId) !== String(currentGuildId)) return;
+            auditLogsCache = [entry, ...auditLogsCache.filter(x => x.id !== entry.id)].slice(0, 100);
+            renderAuditLogs();
         }
 
         async function loadAuditLogs(guildId) {
@@ -2827,8 +2918,7 @@
                 try {
                     const entry = JSON.parse(event.data);
                     if (entry && entry.guildId === currentGuildId) {
-                        auditLogsCache = [entry, ...auditLogsCache.filter(x => x.id !== entry.id)].slice(0, 100);
-                        renderAuditLogs();
+                        appendAuditLogEntry(entry);
                     }
                 } catch {}
             };
