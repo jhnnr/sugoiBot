@@ -55,8 +55,16 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Logs / Screenshots
-      description: Paste any relevant console output, stack traces, or attach screenshots.
+      label: Relevant Logs
+      description: Paste any relevant console output or stack traces.
       render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Attach or paste any screenshots that help explain the problem.
     validations:
       required: false
