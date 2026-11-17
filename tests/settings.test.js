@@ -193,4 +193,36 @@ describe('SettingsManager', () => {
             log_events_member_join: true
         });
     });
+
+    it('validate should use batch context for cross-field xp_min/xp_max and work_min/work_max validation', () => {
+        const batchValid = { xp_min: 25, xp_max: 50, work_min: 60, work_max: 120 };
+        expect(SettingsManager.validate('xp_min', 25, batchValid)).toBe(true);
+        expect(SettingsManager.validate('xp_max', 50, batchValid)).toBe(true);
+        expect(SettingsManager.validate('work_min', 60, batchValid)).toBe(true);
+        expect(SettingsManager.validate('work_max', 120, batchValid)).toBe(true);
+
+        const batchInvalid = { xp_min: 60, xp_max: 40, work_min: 100, work_max: 50 };
+        expect(SettingsManager.validate('xp_min', 60, batchInvalid)).toBe(false);
+        expect(SettingsManager.validate('xp_max', 40, batchInvalid)).toBe(false);
+        expect(SettingsManager.validate('work_min', 100, batchInvalid)).toBe(false);
+        expect(SettingsManager.validate('work_max', 50, batchInvalid)).toBe(false);
+    });
+
+    it('setGuildMany should sanitize channel snowflakes and validate batch ranges with context', () => {
+        const mockRun = vi.fn();
+        db.prepare.mockReturnValue({ run: mockRun });
+        db.transaction = vi.fn((fn) => (items) => fn(items));
+
+        SettingsManager.setGuildMany('guild_batch_1', {
+            log_channel_id: '"123456789012345678"',
+            xp_channel_id: "'987654321098765432'",
+            xp_min: 30,
+            xp_max: 60
+        });
+
+        expect(mockRun).toHaveBeenCalledWith('guild_batch_1', 'log_channel_id', JSON.stringify('123456789012345678'));
+        expect(mockRun).toHaveBeenCalledWith('guild_batch_1', 'xp_channel_id', JSON.stringify('987654321098765432'));
+        expect(mockRun).toHaveBeenCalledWith('guild_batch_1', 'xp_min', JSON.stringify(30));
+        expect(mockRun).toHaveBeenCalledWith('guild_batch_1', 'xp_max', JSON.stringify(60));
+    });
 });
