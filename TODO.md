@@ -26,6 +26,7 @@
 - [x] **Role Rewards Management Command**: Add an in-Discord slash command (`/setreward`) and dashboard XP modal integration to configure level role rewards.
 
 ## 🟢 Low Priority
+- [ ] **Add Leaderboard at Dashboard**: Display server XP and level leaderboard rankings directly within the management dashboard.
 - [x] **Export & Import Server Settings**: Allow server administrators to export and restore their complete configuration as a JSON file.
 - [x] **Server Audit Log Web Viewer**: Stream recent server audit logs directly within the management dashboard.
 - [x] **Web Dashboard**: Create an Express.js backend to serve a settings dashboard with live configuration editing.
