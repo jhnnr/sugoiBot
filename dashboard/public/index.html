@@ -1526,12 +1526,43 @@
         let currentGuildId = null;
         let currentGuildName = '';
         let originalFormState = {};
+        let initialFormState = originalFormState;
+        let hasUserEditedForm = false;
         let currentRoleRewards = {};
         let currentCommandRoles = {};
         let allCommandsCache = [];
         let guildRolesCache = [];
+        let roleComboboxCleanups = [];
         let auditLogEventSource = null;
         let auditLogsCache = [];
+
+        function stableStringifyMap(obj) {
+            if (!obj || typeof obj !== 'object') return '{}';
+            const sorted = {};
+            Object.keys(obj)
+                .filter(k => obj[k] !== undefined && obj[k] !== null && obj[k] !== '')
+                .sort()
+                .forEach(k => {
+                    sorted[k] = String(obj[k]);
+                });
+            return JSON.stringify(sorted);
+        }
+
+        function isAuxiliaryInput(el) {
+            if (!el) return true;
+            const id = el.id || el.name || '';
+            return (
+                id === 'log_channel_search' ||
+                id === 'xp_channel_search' ||
+                id === 'new_reward_level' ||
+                id === 'new_reward_role_select' ||
+                id === 'importSettingsFileInput' ||
+                id === 'auditLogTypeFilter' ||
+                id === 'auditLogSearchInput' ||
+                id.startsWith('cmd_role_search_') ||
+                (el.classList && el.classList.contains('cmd-role-search-input'))
+            );
+        }
 
         async function loadAllCommands() {
             try {
@@ -1540,6 +1571,11 @@
                     const data = await res.json();
                     allCommandsCache = data.commands || [];
                     renderCommandRolesList();
+                    if (currentGuildId && (isSwitchingGuild || !hasUserEditedForm) && Object.keys(originalFormState).length > 0) {
+                        originalFormState = captureFormState();
+                        initialFormState = originalFormState;
+                        floatingSaveBar.classList.remove('visible');
+                    }
                 }
             } catch (e) {}
         }
@@ -1556,7 +1592,7 @@
             const wrapper = document.getElementById(wrapperId);
             const searchInput = document.getElementById(searchInputId);
             const dropdown = document.getElementById(dropdownId);
-            if (!wrapper || !searchInput || !dropdown) return;
+            if (!wrapper || !searchInput || !dropdown) return null;
 
             let allRoles = roles || [];
             let currentId = selectedRoleId || '';
@@ -1567,7 +1603,11 @@
                 return match ? '@' + match.name : `Role ID: ${id}`;
             }
 
-            searchInput.value = getDisplayText(currentId);
+            function restoreDisplayFromSelected() {
+                searchInput.value = getDisplayText(currentId);
+            }
+
+            restoreDisplayFromSelected();
 
             function render(filter = '') {
                 const query = filter.toLowerCase().trim().replace(/^@/, '');
@@ -1624,10 +1664,14 @@
             }
 
             function selectRole(roleId) {
-                currentId = roleId;
-                searchInput.value = getDisplayText(roleId);
+                const nextId = roleId || '';
+                const changed = currentId !== nextId;
+                currentId = nextId;
+                searchInput.value = getDisplayText(currentId);
                 dropdown.classList.remove('open');
-                onSelect(cmdName, roleId);
+                if (changed) {
+                    onSelect(cmdName, currentId);
+                }
             }
 
             function syncValueFromInput() {
@@ -1649,14 +1693,12 @@
                     return;
                 }
 
-                const filtered = allRoles.filter(r => r.name.toLowerCase().includes(clean));
-                if (filtered.length === 1) {
-                    selectRole(filtered[0].id);
-                    return;
-                }
-
-                searchInput.value = getDisplayText(currentId);
+                restoreDisplayFromSelected();
             }
+
+            dropdown.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            });
 
             searchInput.addEventListener('focus', () => {
                 const query = searchInput.value.startsWith('@') ? '' : searchInput.value;
@@ -1668,14 +1710,6 @@
                 const query = searchInput.value;
                 render(query.startsWith('@') ? query.slice(1) : query);
                 dropdown.classList.add('open');
-
-                if (/^\d{17,20}$/.test(query.trim())) {
-                    currentId = query.trim();
-                    onSelect(cmdName, currentId);
-                } else if (!query.trim()) {
-                    currentId = '';
-                    onSelect(cmdName, '');
-                }
             });
 
             searchInput.addEventListener('keydown', (e) => {
@@ -1686,12 +1720,27 @@
                 }
             });
 
-            document.addEventListener('click', (e) => {
+            searchInput.addEventListener('blur', () => {
+                dropdown.classList.remove('open');
+                restoreDisplayFromSelected();
+            });
+
+            const onDocClick = (e) => {
+                if (!dropdown.classList.contains('open')) return;
                 if (!e.target.closest('#' + wrapperId)) {
                     dropdown.classList.remove('open');
-                    syncValueFromInput();
+                    restoreDisplayFromSelected();
                 }
-            });
+            };
+            document.addEventListener('click', onDocClick);
+            roleComboboxCleanups.push(() => document.removeEventListener('click', onDocClick));
+
+            return {
+                setRole(roleId) {
+                    currentId = roleId || '';
+                    restoreDisplayFromSelected();
+                }
+            };
         }
 
         function toggleSubcommands(cmdName) {
@@ -1704,6 +1753,9 @@
         }
 
         function renderCommandRolesList() {
+            roleComboboxCleanups.forEach(cleanup => cleanup());
+            roleComboboxCleanups = [];
+
             document.querySelectorAll('.module-cmd-roles').forEach(container => {
                 const mod = container.getAttribute('data-module');
                 const moduleCmds = allCommandsCache.filter(c => c.module === mod);
@@ -1798,49 +1850,14 @@
 
                 // Initialize role combobox for parent commands and their subcommands
                 moduleCmds.forEach(cmd => {
-                    setupRoleCombobox({
-                        wrapperId: `cmd_role_wrap_${cmd.name}`,
-                        searchInputId: `cmd_role_search_${cmd.name}`,
-                        dropdownId: `cmd_role_drop_${cmd.name}`,
-                        cmdName: cmd.name,
-                        roles: guildRolesCache,
-                        selectedRoleId: currentCommandRoles[cmd.name] || '',
-                        onSelect: (commandName, roleId) => {
-                            if (roleId) {
-                                currentCommandRoles[commandName] = roleId;
-                            } else {
-                                delete currentCommandRoles[commandName];
-                            }
-
-                            // Cascade parent role to all subcommands
-                            if (cmd.subcommands && cmd.subcommands.length > 0) {
-                                const roleObj = guildRolesCache.find(r => r.id === roleId);
-                                const roleText = roleObj ? '@' + roleObj.name : (roleId ? '@' + roleId : '');
-
-                                cmd.subcommands.forEach(sub => {
-                                    const subKey = `${cmd.name} ${sub.name}`;
-                                    if (roleId) {
-                                        currentCommandRoles[subKey] = roleId;
-                                    } else {
-                                        delete currentCommandRoles[subKey];
-                                    }
-                                    const subInput = document.getElementById(`cmd_role_search_${cmd.name}_${sub.name}`);
-                                    if (subInput) {
-                                        subInput.value = roleText;
-                                    }
-                                });
-                            }
-
-                            checkFormChanges();
-                        }
-                    });
+                    const subComboboxes = {};
 
                     // Initialize each subcommand's combobox
                     if (cmd.subcommands && cmd.subcommands.length > 0) {
                         cmd.subcommands.forEach(sub => {
                             const subKey = `${cmd.name} ${sub.name}`;
                             const subIdKey = `${cmd.name}_${sub.name}`;
-                            setupRoleCombobox({
+                            subComboboxes[sub.name] = setupRoleCombobox({
                                 wrapperId: `cmd_role_wrap_${subIdKey}`,
                                 searchInputId: `cmd_role_search_${subIdKey}`,
                                 dropdownId: `cmd_role_drop_${subIdKey}`,
@@ -1858,6 +1875,39 @@
                             });
                         });
                     }
+
+                    setupRoleCombobox({
+                        wrapperId: `cmd_role_wrap_${cmd.name}`,
+                        searchInputId: `cmd_role_search_${cmd.name}`,
+                        dropdownId: `cmd_role_drop_${cmd.name}`,
+                        cmdName: cmd.name,
+                        roles: guildRolesCache,
+                        selectedRoleId: currentCommandRoles[cmd.name] || '',
+                        onSelect: (commandName, roleId) => {
+                            if (roleId) {
+                                currentCommandRoles[commandName] = roleId;
+                            } else {
+                                delete currentCommandRoles[commandName];
+                            }
+
+                            // Cascade parent role to all subcommands
+                            if (cmd.subcommands && cmd.subcommands.length > 0) {
+                                cmd.subcommands.forEach(sub => {
+                                    const subKey = `${cmd.name} ${sub.name}`;
+                                    if (roleId) {
+                                        currentCommandRoles[subKey] = roleId;
+                                    } else {
+                                        delete currentCommandRoles[subKey];
+                                    }
+                                    if (subComboboxes[sub.name]) {
+                                        subComboboxes[sub.name].setRole(roleId);
+                                    }
+                                });
+                            }
+
+                            checkFormChanges();
+                        }
+                    });
                 });
             });
         }
@@ -1883,6 +1933,7 @@
         async function openModal(modalId) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
+            const wasDirtyBeforeOpen = isFormDirty();
             modal.style.display = 'flex';
             updateBodyScrollLock();
 
@@ -1896,6 +1947,14 @@
                 await refreshXPModalData(currentGuildId);
             } else if (modalId === 'gameroleModal') {
                 await refreshGameRoleModalData(currentGuildId);
+            }
+
+            if (!wasDirtyBeforeOpen && !hasUserEditedForm) {
+                if (Object.keys(originalFormState).length > 0) {
+                    originalFormState = captureFormState();
+                    initialFormState = originalFormState;
+                }
+                floatingSaveBar.classList.remove('visible');
             }
         }
 
@@ -1916,6 +1975,7 @@
                     roleSelect.innerHTML = '<option value="">Select a role...</option>' + 
                         guildRolesCache.map(r => `<option value="${r.id}">@${r.name}</option>`).join('');
                     if (currentSelectedRole) roleSelect.value = currentSelectedRole;
+                    renderCommandRolesList();
                 }
 
                 if (channelsRes.ok) {
@@ -1929,9 +1989,12 @@
                     const sData = await settingsRes.json();
                     const s = sData.settings || {};
                     // If no unsaved edits to role_rewards, sync latest
-                    if (!originalFormState['role_rewards'] || originalFormState['role_rewards'] === JSON.stringify(currentRoleRewards)) {
-                        currentRoleRewards = s.role_rewards || {};
-                        originalFormState['role_rewards'] = JSON.stringify(currentRoleRewards);
+                    if (!originalFormState['role_rewards'] || originalFormState['role_rewards'] === stableStringifyMap(currentRoleRewards)) {
+                        currentRoleRewards = { ...(s.role_rewards || {}) };
+                        if (Object.keys(originalFormState).length > 0) {
+                            originalFormState['role_rewards'] = stableStringifyMap(currentRoleRewards);
+                            initialFormState = originalFormState;
+                        }
                     }
                 }
 
@@ -1948,11 +2011,28 @@
                 if (res.ok) {
                     const sData = await res.json();
                     const s = sData.settings || {};
-                    if (!floatingSaveBar.classList.contains('visible')) {
-                        document.getElementById('gamerole_prefix').value = s.gamerole_prefix || 'PLAYING ';
-                        document.getElementById('gamerole_color').value = s.gamerole_color || '#ff0000';
-                        document.getElementById('gamerole_color_picker').value = (s.gamerole_color && /^#[0-9a-fA-F]{6}$/.test(s.gamerole_color)) ? s.gamerole_color : '#ff0000';
+                    const prefixInput = document.getElementById('gamerole_prefix');
+                    const colorInput = document.getElementById('gamerole_color');
+                    const colorPicker = document.getElementById('gamerole_color_picker');
+
+                    if (originalFormState['gamerole_prefix'] === undefined || prefixInput.value === originalFormState['gamerole_prefix']) {
+                        if (s.gamerole_prefix !== undefined) {
+                            prefixInput.value = s.gamerole_prefix ?? 'PLAYING ';
+                        }
+                        if (Object.keys(originalFormState).length > 0) {
+                            originalFormState['gamerole_prefix'] = prefixInput.value;
+                        }
                     }
+                    if (originalFormState['gamerole_color'] === undefined || colorInput.value === originalFormState['gamerole_color']) {
+                        if (s.gamerole_color !== undefined) {
+                            colorInput.value = s.gamerole_color || '#ff0000';
+                            colorPicker.value = (s.gamerole_color && /^#[0-9a-fA-F]{6}$/.test(s.gamerole_color)) ? s.gamerole_color : '#ff0000';
+                        }
+                        if (Object.keys(originalFormState).length > 0) {
+                            originalFormState['gamerole_color'] = colorInput.value;
+                        }
+                    }
+                    initialFormState = originalFormState;
                 }
             } catch (err) {
                 console.warn('Failed to refresh GameRole modal data:', err);
@@ -2078,7 +2158,7 @@
         });
 
         function getAllSettingsInputs() {
-            return document.querySelectorAll('#settingsForm input, #settingsForm select, [form="settingsForm"]');
+            return document.querySelectorAll('#settingsForm input, #settingsForm select, input[form="settingsForm"], select[form="settingsForm"]');
         }
 
         function submitSettingsFromModal(modalId) {
@@ -2096,67 +2176,87 @@
                 const id = el.id || el.name;
                 if (!id) return;
                 // Exclude search inputs, temporary creation inputs, and auxiliary pickers
-                if (id === 'log_channel_search' || id === 'xp_channel_search' || id === 'new_reward_level' || id === 'new_reward_role_select' || id === 'gamerole_color_picker' || id === 'importSettingsFileInput' || id === 'auditLogTypeFilter' || id === 'auditLogSearchInput' || id.startsWith('cmd_role_search_') || el.classList.contains('cmd-role-search-input')) return;
+                if (isAuxiliaryInput(el) || id === 'gamerole_color_picker') return;
                 state[id] = el.type === 'checkbox' ? el.checked : el.value;
             });
-            state['role_rewards'] = JSON.stringify(currentRoleRewards);
-            state['command_roles'] = JSON.stringify(currentCommandRoles);
+            state['role_rewards'] = stableStringifyMap(currentRoleRewards);
+            state['command_roles'] = stableStringifyMap(currentCommandRoles);
             return state;
         }
 
-        function checkFormChanges() {
-            if (!currentGuildId || isSwitchingGuild || Object.keys(originalFormState).length === 0) {
-                floatingSaveBar.classList.remove('visible');
-                return;
+        function isFormDirty() {
+            const baseline = Object.keys(originalFormState).length > 0 ? originalFormState : initialFormState;
+            if (!currentGuildId || isSwitchingGuild || !baseline || Object.keys(baseline).length === 0) {
+                return false;
             }
             const current = captureFormState();
-            let changed = false;
-            for (const key of Object.keys(originalFormState)) {
-                if (originalFormState[key] !== current[key]) {
-                    changed = true;
-                    break;
+            for (const key of Object.keys(baseline)) {
+                if (baseline[key] !== current[key]) {
+                    return true;
                 }
             }
+            return false;
+        }
+
+        function checkFormChanges() {
+            const changed = isFormDirty();
+            hasUserEditedForm = changed;
             if (changed) {
                 floatingSaveBar.classList.add('visible');
             } else {
                 floatingSaveBar.classList.remove('visible');
             }
+            return changed;
         }
+        const checkFormDirty = checkFormChanges;
 
         function resetFormChanges() {
+            const baseline = Object.keys(originalFormState).length > 0 ? originalFormState : initialFormState;
             const inputs = getAllSettingsInputs();
             inputs.forEach(el => {
                 const id = el.id || el.name;
-                if (!id || originalFormState[id] === undefined) return;
+                if (!id || baseline[id] === undefined) return;
                 if (el.type === 'checkbox') {
-                    el.checked = originalFormState[id];
+                    el.checked = baseline[id];
                 } else {
-                    el.value = originalFormState[id];
+                    el.value = baseline[id];
                 }
             });
-            if (originalFormState['role_rewards']) {
+            if (baseline['role_rewards']) {
                 try {
-                    currentRoleRewards = JSON.parse(originalFormState['role_rewards']);
+                    currentRoleRewards = JSON.parse(baseline['role_rewards']);
                     renderRoleRewardsList();
                 } catch {}
             }
-            if (originalFormState['command_roles']) {
+            if (baseline['command_roles']) {
                 try {
-                    currentCommandRoles = JSON.parse(originalFormState['command_roles']);
+                    currentCommandRoles = JSON.parse(baseline['command_roles']);
                     renderCommandRolesList();
                 } catch {}
             }
+            if (typeof logChannelCombobox !== 'undefined' && logChannelCombobox.syncDisplay) {
+                logChannelCombobox.syncDisplay();
+            }
+            if (typeof xpChannelCombobox !== 'undefined' && xpChannelCombobox.syncDisplay) {
+                xpChannelCombobox.syncDisplay();
+            }
+            const colorVal = document.getElementById('gamerole_color').value.trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(colorVal)) {
+                document.getElementById('gamerole_color_picker').value = colorVal;
+            }
+            hasUserEditedForm = false;
             checkFormChanges();
         }
 
         resetBtn.addEventListener('click', resetFormChanges);
         document.addEventListener('input', (e) => {
+            if (isAuxiliaryInput(e.target)) return;
             if (e.target.closest('#settingsForm, [form="settingsForm"], .modal-box')) {
                 checkFormChanges();
             }
         });
         document.addEventListener('change', (e) => {
+            if (isAuxiliaryInput(e.target)) return;
             if (e.target.closest('#settingsForm, [form="settingsForm"], .modal-box')) {
                 checkFormChanges();
             }
@@ -2295,6 +2395,16 @@
             const dropdown = document.getElementById(dropdownId);
             let allChannels = [];
 
+            function getDisplayText(id) {
+                if (!id) return '';
+                const match = allChannels.find(c => c.id === id);
+                return match ? '#' + match.name : `Channel ID: ${id}`;
+            }
+
+            function restoreDisplayFromSelected() {
+                searchInput.value = getDisplayText(hiddenInput.value);
+            }
+
             function render(filter = '') {
                 const query = filter.toLowerCase().trim();
                 const filtered = allChannels.filter(c => 
@@ -2307,7 +2417,8 @@
                 const defaultItem = document.createElement('div');
                 defaultItem.className = 'combobox-item' + (!hiddenInput.value ? ' selected' : '');
                 defaultItem.innerHTML = `<span>${defaultLabel}</span>`;
-                defaultItem.addEventListener('click', () => {
+                defaultItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     selectItem('', defaultLabel);
                 });
                 dropdown.appendChild(defaultItem);
@@ -2317,7 +2428,8 @@
                         const customItem = document.createElement('div');
                         customItem.className = 'combobox-item';
                         customItem.innerHTML = `<span>Custom ID: <strong>${query}</strong></span>`;
-                        customItem.addEventListener('click', () => {
+                        customItem.addEventListener('click', (e) => {
+                            e.stopPropagation();
                             selectItem(query, `Channel ID: ${query}`);
                         });
                         dropdown.appendChild(customItem);
@@ -2332,7 +2444,8 @@
                         const item = document.createElement('div');
                         item.className = 'combobox-item' + (hiddenInput.value === ch.id ? ' selected' : '');
                         item.innerHTML = `<span>#${ch.name}</span><span class="combobox-item-id">${ch.id}</span>`;
-                        item.addEventListener('click', () => {
+                        item.addEventListener('click', (e) => {
+                            e.stopPropagation();
                             selectItem(ch.id, '#' + ch.name);
                         });
                         dropdown.appendChild(item);
@@ -2341,24 +2454,26 @@
             }
 
             function selectItem(id, displayText) {
-                hiddenInput.value = id;
-                searchInput.value = id ? displayText : '';
+                const nextId = id || '';
+                const changed = hiddenInput.value !== nextId;
+                hiddenInput.value = nextId;
+                searchInput.value = nextId ? (displayText || getDisplayText(nextId)) : '';
                 dropdown.classList.remove('open');
-                checkFormChanges();
+                if (changed) {
+                    checkFormChanges();
+                }
             }
 
             function syncValueFromInput() {
                 const query = searchInput.value.trim();
                 if (!query) {
-                    hiddenInput.value = '';
-                    checkFormChanges();
+                    selectItem('', defaultLabel);
                     return;
                 }
 
                 // If user typed 17-20 digit snowflake ID
                 if (/^\d{17,20}$/.test(query)) {
-                    hiddenInput.value = query;
-                    checkFormChanges();
+                    selectItem(query, `Channel ID: ${query}`);
                     return;
                 }
 
@@ -2370,21 +2485,13 @@
                     return;
                 }
 
-                // If only 1 filtered channel matches
-                const filtered = allChannels.filter(c => c.name.toLowerCase().includes(clean));
-                if (filtered.length === 1) {
-                    selectItem(filtered[0].id, '#' + filtered[0].name);
-                    return;
-                }
-
                 // Revert to existing selected value display
-                if (hiddenInput.value) {
-                    const match = allChannels.find(c => c.id === hiddenInput.value);
-                    searchInput.value = match ? '#' + match.name : (hiddenInput.value ? `Channel ID: ${hiddenInput.value}` : '');
-                } else {
-                    searchInput.value = '';
-                }
+                restoreDisplayFromSelected();
             }
+
+            dropdown.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            });
 
             searchInput.addEventListener('focus', () => {
                 const query = searchInput.value.startsWith('#') ? '' : searchInput.value;
@@ -2396,13 +2503,6 @@
                 const query = searchInput.value;
                 render(query.startsWith('#') ? query.slice(1) : query);
                 dropdown.classList.add('open');
-
-                if (/^\d{17,20}$/.test(query.trim())) {
-                    hiddenInput.value = query.trim();
-                } else if (!query.trim()) {
-                    hiddenInput.value = '';
-                }
-                checkFormChanges();
             });
 
             searchInput.addEventListener('keydown', (e) => {
@@ -2413,25 +2513,32 @@
                 }
             });
 
+            searchInput.addEventListener('blur', () => {
+                dropdown.classList.remove('open');
+                restoreDisplayFromSelected();
+            });
+
             document.addEventListener('click', (e) => {
+                if (!dropdown.classList.contains('open')) return;
                 if (!e.target.closest('#' + wrapperId)) {
                     dropdown.classList.remove('open');
-                    syncValueFromInput();
+                    restoreDisplayFromSelected();
                 }
             });
 
             return {
                 setChannels(channels, selectedId) {
                     allChannels = channels || [];
-                    hiddenInput.value = selectedId || '';
-                    const match = allChannels.find(c => c.id === selectedId);
-                    if (match) {
-                        searchInput.value = '#' + match.name;
-                    } else if (selectedId) {
-                        searchInput.value = `Channel ID: ${selectedId}`;
-                    } else {
-                        searchInput.value = '';
+                    const nextId = selectedId !== undefined ? (selectedId || '') : hiddenInput.value;
+                    hiddenInput.value = nextId;
+                    restoreDisplayFromSelected();
+                    if ((isSwitchingGuild || !hasUserEditedForm) && Object.keys(originalFormState).length > 0) {
+                        originalFormState[hiddenInputId] = hiddenInput.value;
+                        initialFormState = originalFormState;
                     }
+                },
+                syncDisplay() {
+                    restoreDisplayFromSelected();
                 },
                 setLoading() {
                     searchInput.value = '';
@@ -2815,8 +2922,10 @@
 
         async function selectGuild(guildId, guildName) {
             isSwitchingGuild = true;
+            hasUserEditedForm = false;
             floatingSaveBar.classList.remove('visible');
             originalFormState = {};
+            initialFormState = originalFormState;
             currentGuildId = guildId;
             currentGuildName = guildName || '';
 
@@ -2843,6 +2952,7 @@
                     fetch(`/api/guilds/${guildId}/roles`)
                 ]);
 
+                if (currentGuildId !== guildId) return;
                 if (!settingsRes.ok) throw new Error('Settings fetch failed');
                 const sData = await settingsRes.json();
                 const s = sData.settings || {};
@@ -2866,11 +2976,11 @@
                     guildRolesCache.map(r => `<option value="${r.id}">@${r.name}</option>`).join('');
 
                 // Load Command Roles
-                currentCommandRoles = s.command_roles || {};
+                currentCommandRoles = { ...(s.command_roles || {}) };
                 renderCommandRolesList();
 
                 // Load Role Rewards
-                currentRoleRewards = s.role_rewards || {};
+                currentRoleRewards = { ...(s.role_rewards || {}) };
                 renderRoleRewardsList();
 
                 // Populate Searchable Comboboxes
@@ -2910,7 +3020,7 @@
                 document.getElementById('voice_default_limit').value = s.voice_default_limit ?? s.voicemaster_default_limit ?? 0;
 
                 // Populate GameRole Settings Modal inputs
-                document.getElementById('gamerole_prefix').value = s.gamerole_prefix || 'PLAYING ';
+                document.getElementById('gamerole_prefix').value = s.gamerole_prefix ?? 'PLAYING ';
                 document.getElementById('gamerole_color').value = s.gamerole_color || '#ff0000';
                 document.getElementById('gamerole_color_picker').value = (s.gamerole_color && /^#[0-9a-fA-F]{6}$/.test(s.gamerole_color)) ? s.gamerole_color : '#ff0000';
                 document.getElementById('gamerole_position').value = s.gamerole_position ?? 0;
@@ -2920,12 +3030,20 @@
 
                 // Capture initial state for change detection
                 originalFormState = captureFormState();
+                initialFormState = originalFormState;
                 floatingSaveBar.classList.remove('visible');
 
                 // Clear switching guard after DOM settles
                 setTimeout(() => {
+                    if (currentGuildId !== guildId) return;
                     isSwitchingGuild = false;
-                    floatingSaveBar.classList.remove('visible');
+                    if (!hasUserEditedForm) {
+                        originalFormState = captureFormState();
+                        initialFormState = originalFormState;
+                        floatingSaveBar.classList.remove('visible');
+                    } else {
+                        checkFormChanges();
+                    }
                 }, 100);
             } catch (err) {
                 showAlert('Failed to load settings for this server', false);
@@ -2933,6 +3051,7 @@
                 floatingSaveBar.classList.remove('visible');
             }
         }
+        const loadGuildSettings = selectGuild;
 
         // Color picker sync
         document.getElementById('gamerole_color_picker').addEventListener('input', (e) => {
@@ -2998,7 +3117,11 @@
                 const result = await res.json();
                 if (res.ok) {
                     showAlert('Server settings updated successfully!', true);
+                    document.getElementById('gamerole_prefix').value = payload.gamerole_prefix;
+                    document.getElementById('gamerole_color').value = payload.gamerole_color;
+                    hasUserEditedForm = false;
                     originalFormState = captureFormState();
+                    initialFormState = originalFormState;
                     floatingSaveBar.classList.remove('visible');
                 } else {
                     showAlert(result.error || 'Failed to save server settings', false);
