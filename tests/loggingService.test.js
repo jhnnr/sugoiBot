@@ -95,4 +95,67 @@ describe('Logging Service', () => {
         expect(mockSend).not.toHaveBeenCalled();
         warnSpy.mockRestore();
     });
+
+    it('should persist audit logs to SQLite, emit real-time events, and support filtering even without a Discord log channel', async () => {
+        const auditGuildId = 'g_audit_test_' + Date.now();
+        SettingsManager.getGuildJson.mockReturnValue(true);
+        SettingsManager.getGuild.mockReturnValue(null); // No Discord log_channel_id configured
+
+        const receivedBySub = [];
+        const receivedByEmitter = [];
+        const unsubscribe = loggingService.subscribe(auditGuildId, (entry) => {
+            receivedBySub.push(entry);
+        });
+        const onEmit = (entry) => {
+            if (entry.guildId === auditGuildId) receivedByEmitter.push(entry);
+        };
+        loggingService.events.on('auditLog', onEmit);
+
+        await loggingService.log({ id: auditGuildId, name: 'Audit Test Server' }, {
+            title: 'Member Banned',
+            description: 'Banned SpamBot#0001 for raid activity',
+            eventType: 'log_events_moderation',
+            color: 0xF23F43,
+            user: { id: 'u_mod_1', username: 'StaffMod' },
+            fields: [{ name: 'Reason', value: 'Raid spam' }]
+        });
+
+        loggingService.recordAuditLog(auditGuildId, {
+            title: 'Channel Created',
+            description: 'Created #announcements',
+            eventType: 'log_events_channels',
+            color: 0x5865F2,
+            user: { id: 'u_admin_2', username: 'Architect' }
+        });
+
+        unsubscribe();
+        loggingService.events.off('auditLog', onEmit);
+
+        // Verify subscriber and EventEmitter received both entries
+        expect(receivedBySub.length).toBe(2);
+        expect(receivedByEmitter.length).toBe(2);
+        expect(receivedBySub[0].title).toBe('Member Banned');
+        expect(receivedBySub[0].username).toBe('StaffMod');
+
+        // Verify unsubscribed listener no longer receives events
+        loggingService.recordAuditLog(auditGuildId, {
+            title: 'After Unsubscribe',
+            description: 'Should not trigger unsubscribed callback',
+            eventType: 'log_events_commands'
+        });
+        expect(receivedBySub.length).toBe(2);
+
+        // Verify SQLite persistence and filtering via getAuditLogs
+        const allLogs = loggingService.getAuditLogs(auditGuildId, { limit: 10 });
+        expect(allLogs.length).toBe(3);
+
+        const modOnly = loggingService.getAuditLogs(auditGuildId, { eventType: 'log_events_moderation' });
+        expect(modOnly.length).toBe(1);
+        expect(modOnly[0].title).toBe('Member Banned');
+        expect(modOnly[0].fields).toEqual([{ name: 'Reason', value: 'Raid spam' }]);
+
+        const searched = loggingService.getAuditLogs(auditGuildId, { search: 'announcements' });
+        expect(searched.length).toBe(1);
+        expect(searched[0].eventType).toBe('log_events_channels');
+    });
 });
