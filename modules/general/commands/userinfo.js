@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import db from '../../../lib/database.js';
 import { Member } from '../../../lib/classes/Member.js';
+import { SettingsManager } from '../../../lib/settings.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -89,9 +90,15 @@ export default {
         const activity = presence?.activities?.[0]?.name ? `🎮 Playing **${presence.activities[0].name}**` : 'None';
 
         // Build Telemetry Embed
-        const embedColor = targetMember?.displayHexColor && targetMember.displayHexColor !== '#000000'
+        const defaultColor = targetMember?.displayHexColor && targetMember.displayHexColor !== '#000000'
             ? targetMember.displayHexColor
             : 0x5865F2;
+        let embedColor = defaultColor;
+        try {
+            if (typeof SettingsManager.getEmbedColor === 'function') {
+                embedColor = SettingsManager.getEmbedColor(guild.id, 'general', defaultColor);
+            }
+        } catch {}
 
         const embed = new EmbedBuilder()
             .setTitle(`👤 User Info: ${targetUser.username}`)

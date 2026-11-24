@@ -9,12 +9,12 @@
 - [x] **Dynamic Guild Settings**: Migrate single-row settings to per-guild configuration schema (`guild_settings`).
 
 ## 🟡 Medium Priority
-- [ ] **Voice Hub Creator on Dashboard**: Allow server administrators to create new Join-to-Create voice hubs directly from the web dashboard.
-- [ ] **Moderation Warnings Web Viewer**: Add a server moderation interface on the dashboard to inspect, paginate, and revoke member warnings.
-- [ ] **Economy Server Shop & Inventory**: Allow administrators to configure server shop items and roles purchasable with economy currency.
-- [ ] **Custom Module Embed Colors**: Allow per-guild customization of bot embed accent colors directly from the dashboard.
+- [x] **Voice Hub Creator on Dashboard**: Allow server administrators to create new Join-to-Create voice hubs directly from the web dashboard.
+- [x] **Moderation Warnings Web Viewer**: Add a server moderation interface on the dashboard to inspect, paginate, and revoke member warnings.
+- [x] **Economy Server Shop & Inventory**: Allow administrators to configure server shop items and roles purchasable with economy currency.
+- [x] **Custom Module Embed Colors**: Allow per-guild customization of bot embed accent colors directly from the dashboard.
 - [x] **Command Role Permissions & Subcommand Cascading**: Role-based permissions per module, searchable role comboboxes, and automatic parent-to-subcommand role cascading.
-- [ ] **Ability to select multiple roles in Command Role Permissions**
+- [x] **Ability to select multiple roles in Command Role Permissions**
 - [x] **User Info Command**: User telemetry inspection command (`/userinfo`) displaying account age, join date, inviter, roles, permissions, level, rank, economy, and activity.
 - [x] **Moderation Module**: Implement basic moderation commands (`kick`, `ban`, `clear`, `warn`).
 - [x] **Economy Module**: Add a basic currency system (balance, daily, work, coinflip).

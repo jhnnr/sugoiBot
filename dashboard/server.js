@@ -60,6 +60,7 @@ const DEFAULT_GLOBAL_SETTINGS = {
 
 export const DEFAULT_GUILD_SETTINGS = {
     command_roles: {},
+    module_embed_colors: {},
     log_channel_id: '',
     xp_channel_id: '',
     log_events_member_join: true,
@@ -371,11 +372,23 @@ function sanitizeSettingsPayload(rawUpdates) {
         } else if ((key === 'command_roles' || key === 'role_rewards') && val && typeof val === 'object' && !Array.isArray(val)) {
             const cleanMap = {};
             for (const [subKey, roleVal] of Object.entries(val)) {
-                cleanMap[String(subKey)] = typeof roleVal === 'string'
-                    ? roleVal.replace(/^["']|["']$/g, '').trim()
-                    : roleVal;
+                if (typeof roleVal === 'string') {
+                    cleanMap[String(subKey)] = roleVal.replace(/^["']|["']$/g, '').trim();
+                } else if (key === 'command_roles' && Array.isArray(roleVal) && roleVal.every(item => typeof item === 'string')) {
+                    cleanMap[String(subKey)] = SettingsManager.normalizeCommandRoles(roleVal);
+                } else {
+                    cleanMap[String(subKey)] = roleVal;
+                }
             }
             sanitized[key] = cleanMap;
+        } else if (key === 'module_embed_colors' && val && typeof val === 'object' && !Array.isArray(val)) {
+            const cleanColors = {};
+            for (const [modKey, colorVal] of Object.entries(val)) {
+                cleanColors[String(modKey).toLowerCase()] = typeof colorVal === 'string'
+                    ? colorVal.trim()
+                    : colorVal;
+            }
+            sanitized[key] = cleanColors;
         } else {
             sanitized[key] = val;
         }
@@ -452,6 +465,15 @@ app.get('/api/guilds/:guildId/settings/export', (req, res) => {
         if (!voice_hubs || voice_hubs.length === 0) {
             voice_hubs = db.prepare('SELECT hubChannelId, categoryId FROM voice_guilds WHERE guildId = ? AND hubChannelId IS NOT NULL').all(guildId);
         }
+        const shop_items = db.prepare('SELECT name, description, price, roleId, stock FROM shop_items WHERE guildId = ? ORDER BY price ASC, id ASC')
+            .all(guildId)
+            .map(item => ({
+                name: item.name,
+                description: item.description ?? '',
+                price: Number(item.price),
+                roleId: item.roleId || '',
+                stock: Number(item.stock)
+            }));
 
         res.setHeader('Content-Disposition', `attachment; filename="sugoibot-settings-${guildId}.json"`);
         res.json({
@@ -462,7 +484,9 @@ app.get('/api/guilds/:guildId/settings/export', (req, res) => {
             gamerole_whitelist,
             gameroleWhitelist: gamerole_whitelist,
             voice_hubs,
-            voiceHubs: voice_hubs
+            voiceHubs: voice_hubs,
+            shop_items,
+            shopItems: shop_items
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to export server settings' });
@@ -501,7 +525,9 @@ app.post('/api/guilds/:guildId/settings/import', (req, res) => {
             'gamerole_whitelist',
             'gameroleWhitelist',
             'voice_hubs',
-            'voiceHubs'
+            'voiceHubs',
+            'shop_items',
+            'shopItems'
         ]);
         for (const [k, v] of Object.entries(payload)) {
             if (!metaKeys.has(k)) {
@@ -516,6 +542,9 @@ app.post('/api/guilds/:guildId/settings/import', (req, res) => {
     const rawVoiceHubs = 'voice_hubs' in payload
         ? payload.voice_hubs
         : ('voiceHubs' in payload ? payload.voiceHubs : undefined);
+    const rawShopItems = 'shop_items' in payload
+        ? payload.shop_items
+        : ('shopItems' in payload ? payload.shopItems : undefined);
 
     if (rawWhitelist !== undefined) {
         if (!Array.isArray(rawWhitelist)) {
@@ -542,12 +571,42 @@ app.post('/api/guilds/:guildId/settings/import', (req, res) => {
         }
     }
 
+    if (rawShopItems !== undefined) {
+        if (!Array.isArray(rawShopItems)) {
+            return res.status(400).json({ error: 'Field "shop_items" must be an array' });
+        }
+        for (const item of rawShopItems) {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+                return res.status(400).json({ error: 'Invalid entry in "shop_items"' });
+            }
+            if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 100) {
+                return res.status(400).json({ error: 'Invalid item name in "shop_items"' });
+            }
+            if (item.description !== undefined && item.description !== null && (typeof item.description !== 'string' || item.description.trim().length > 500)) {
+                return res.status(400).json({ error: 'Invalid item description in "shop_items"' });
+            }
+            const parsedPrice = typeof item.price === 'number' ? item.price : Number.NaN;
+            if (!Number.isFinite(parsedPrice) || !Number.isInteger(parsedPrice) || parsedPrice < 0) {
+                return res.status(400).json({ error: 'Invalid item price in "shop_items"' });
+            }
+            if (item.roleId !== undefined && item.roleId !== null && typeof item.roleId !== 'string') {
+                return res.status(400).json({ error: 'Invalid item roleId in "shop_items"' });
+            }
+            if (item.stock !== undefined && item.stock !== null) {
+                if (typeof item.stock !== 'number' || !Number.isInteger(item.stock) || item.stock < -1) {
+                    return res.status(400).json({ error: 'Invalid item stock in "shop_items"' });
+                }
+            }
+        }
+    }
+
     const sanitizedSettings = sanitizeSettingsPayload(rawSettings);
     const hasSettings = Object.keys(sanitizedSettings).length > 0;
     const hasWhitelist = Array.isArray(rawWhitelist);
     const hasVoiceHubs = Array.isArray(rawVoiceHubs);
+    const hasShopItems = Array.isArray(rawShopItems);
 
-    if (!hasSettings && !hasWhitelist && !hasVoiceHubs) {
+    if (!hasSettings && !hasWhitelist && !hasVoiceHubs && !hasShopItems) {
         return res.status(400).json({ error: 'Import payload contains no configuration data' });
     }
 
@@ -595,6 +654,25 @@ app.post('/api/guilds/:guildId/settings/import', (req, res) => {
                     );
                 }
             }
+
+            if (hasShopItems) {
+                db.prepare('DELETE FROM shop_items WHERE guildId = ?').run(guildId);
+                const insertShop = db.prepare(`
+                    INSERT INTO shop_items (guildId, name, description, price, roleId, stock, createdAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                `);
+                const now = Date.now();
+                for (const item of rawShopItems) {
+                    const cleanName = item.name.trim();
+                    const cleanDesc = typeof item.description === 'string' ? item.description.trim() : '';
+                    const cleanPrice = Number(item.price);
+                    const cleanRole = typeof item.roleId === 'string'
+                        ? item.roleId.replace(/^["']|["']$/g, '').trim()
+                        : '';
+                    const cleanStock = item.stock === undefined || item.stock === null ? -1 : Number(item.stock);
+                    insertShop.run(guildId, cleanName, cleanDesc, cleanPrice, cleanRole, cleanStock, now);
+                }
+            }
         });
 
         importTx();
@@ -610,6 +688,15 @@ app.post('/api/guilds/:guildId/settings/import', (req, res) => {
         const updatedSettings = { ...DEFAULT_GUILD_SETTINGS, ...SettingsManager.getAllGuild(guildId) };
         const updatedWhitelist = db.prepare('SELECT gameName, roleName FROM gamerole_whitelist WHERE guildId = ? ORDER BY gameName ASC').all(guildId);
         const updatedHubs = db.prepare('SELECT hubChannelId, categoryId FROM voice_hubs WHERE guildId = ?').all(guildId);
+        const updatedShopItems = db.prepare('SELECT name, description, price, roleId, stock FROM shop_items WHERE guildId = ? ORDER BY price ASC, id ASC')
+            .all(guildId)
+            .map(item => ({
+                name: item.name,
+                description: item.description ?? '',
+                price: Number(item.price),
+                roleId: item.roleId || '',
+                stock: Number(item.stock)
+            }));
 
         res.json({
             success: true,
@@ -618,7 +705,9 @@ app.post('/api/guilds/:guildId/settings/import', (req, res) => {
             gamerole_whitelist: updatedWhitelist,
             gameroleWhitelist: updatedWhitelist,
             voice_hubs: updatedHubs,
-            voiceHubs: updatedHubs
+            voiceHubs: updatedHubs,
+            shop_items: updatedShopItems,
+            shopItems: updatedShopItems
         });
     } catch (error) {
         res.status(400).json({ error: error.message || 'Failed to import server settings' });
@@ -877,16 +966,74 @@ app.get('/api/guilds/:guildId/voice', async (req, res) => {
         const activeRooms = db.prepare('SELECT * FROM voice_channels WHERE guildId = ?').all(guildId);
 
         let discordChannels = [];
-        if (process.env.DISCORD_TOKEN) {
+        let resolvedFromClient = false;
+
+        // 1. Live Discord client resolution first
+        if (discordClient) {
             try {
-                const cRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
-                    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }
-                });
-                if (cRes.ok) discordChannels = await cRes.json();
+                const guild = discordClient.guilds?.cache?.get?.(guildId)
+                    || (typeof discordClient.guilds?.fetch === 'function'
+                        ? await discordClient.guilds.fetch(guildId).catch(() => null)
+                        : null);
+                if (guild?.channels) {
+                    const fetched = typeof guild.channels.fetch === 'function'
+                        ? await guild.channels.fetch().catch(() => guild.channels.cache)
+                        : guild.channels.cache;
+                    const rawCollection = fetched || guild.channels.cache;
+                    if (rawCollection) {
+                        const list = Array.isArray(rawCollection)
+                            ? rawCollection
+                            : (typeof rawCollection.values === 'function' ? Array.from(rawCollection.values()) : []);
+                        discordChannels = list.filter(Boolean).map(c => ({
+                            id: c.id,
+                            name: c.name,
+                            type: c.type,
+                            position: typeof c.position === 'number' ? c.position : (typeof c.rawPosition === 'number' ? c.rawPosition : 0),
+                            parent_id: c.parentId ?? c.parent_id ?? null,
+                            user_limit: c.userLimit ?? c.user_limit ?? 0
+                        }));
+                        resolvedFromClient = true;
+                    }
+                }
             } catch {}
         }
 
+        // 2. Fallback to Discord REST API with quote-sanitized DISCORD_TOKEN
+        if (!resolvedFromClient) {
+            const rawToken = process.env.DISCORD_TOKEN;
+            const botToken = rawToken ? rawToken.trim().replace(/^["']|["']$/g, '') : '';
+            if (botToken) {
+                try {
+                    const cRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+                        headers: { Authorization: `Bot ${botToken}` }
+                    });
+                    if (cRes.ok) {
+                        const data = await cRes.json();
+                        if (Array.isArray(data)) {
+                            discordChannels = data.map(c => ({
+                                id: c.id,
+                                name: c.name,
+                                type: c.type,
+                                position: typeof c.position === 'number' ? c.position : 0,
+                                parent_id: c.parent_id ?? c.parentId ?? null,
+                                user_limit: c.user_limit ?? c.userLimit ?? 0
+                            }));
+                        }
+                    }
+                } catch {}
+            }
+        }
+
         const channelMap = new Map(discordChannels.map(c => [c.id, c]));
+
+        const categories = discordChannels
+            .filter(c => c && c.type === 4)
+            .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+            .map(c => ({
+                id: c.id,
+                name: c.name,
+                position: c.position ?? 0
+            }));
 
         const enrichedHubs = (hubs || []).map(h => {
             const ch = channelMap.get(h.hubChannelId);
@@ -926,10 +1073,223 @@ app.get('/api/guilds/:guildId/voice', async (req, res) => {
 
         res.json({
             hubs: enrichedHubs,
-            activeRooms: enrichedRooms
+            activeRooms: enrichedRooms,
+            categories
         });
     } catch (err) {
         res.status(500).json({ error: 'Failed to retrieve voice status' });
+    }
+});
+
+app.post('/api/guilds/:guildId/voice/hubs', async (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId } = req.params;
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const rawName = body.name !== undefined ? body.name : body.hubName;
+    if (rawName !== undefined && rawName !== null && typeof rawName !== 'string') {
+        return res.status(400).json({ error: 'Voice hub name must be a string.' });
+    }
+    const hubChannelName = (typeof rawName === 'string' && rawName.trim())
+        ? rawName.trim()
+        : 'Join to Create';
+    if (hubChannelName.length < 1 || hubChannelName.length > 100) {
+        return res.status(400).json({ error: 'Voice hub name must be between 1 and 100 characters.' });
+    }
+
+    if (body.categoryId !== undefined && body.categoryId !== null && typeof body.categoryId !== 'string') {
+        return res.status(400).json({ error: 'categoryId must be a string.' });
+    }
+    if (body.createCategoryName !== undefined && body.createCategoryName !== null && typeof body.createCategoryName !== 'string') {
+        return res.status(400).json({ error: 'createCategoryName must be a string.' });
+    }
+
+    const newCategoryName = typeof body.createCategoryName === 'string' ? body.createCategoryName.trim() : '';
+    if (newCategoryName.length > 100) {
+        return res.status(400).json({ error: 'Category name must be 100 characters or fewer.' });
+    }
+
+    let sanitizedCategoryId = typeof body.categoryId === 'string'
+        ? body.categoryId.replace(/^["']|["']$/g, '').trim()
+        : '';
+    if (newCategoryName && (sanitizedCategoryId === '__new__' || sanitizedCategoryId === 'new')) {
+        sanitizedCategoryId = '';
+    }
+
+    let finalCategoryId = sanitizedCategoryId || null;
+    let resolvedCategoryName = null;
+    let createdChannelId = null;
+    let createdChannelName = hubChannelName;
+    let createdVia = null;
+
+    let clientGuild = null;
+    if (discordClient) {
+        clientGuild = discordClient.guilds?.cache?.get?.(guildId)
+            || (typeof discordClient.guilds?.fetch === 'function'
+                ? await discordClient.guilds.fetch(guildId).catch(() => null)
+                : null);
+    }
+
+    // 1. Try live discordClient first
+    if (clientGuild && typeof clientGuild.channels?.create === 'function') {
+        try {
+            if (!finalCategoryId && newCategoryName) {
+                const createdCat = await clientGuild.channels.create({
+                    name: newCategoryName,
+                    type: 4
+                });
+                if (createdCat?.id) {
+                    finalCategoryId = String(createdCat.id);
+                    resolvedCategoryName = createdCat.name || newCategoryName;
+                }
+            } else if (finalCategoryId) {
+                const existingCat = clientGuild.channels?.cache?.get?.(finalCategoryId)
+                    || (typeof clientGuild.channels?.fetch === 'function'
+                        ? await clientGuild.channels.fetch(finalCategoryId).catch(() => null)
+                        : null);
+                if (existingCat?.name) {
+                    resolvedCategoryName = existingCat.name;
+                }
+            }
+
+            const createdVoice = await clientGuild.channels.create({
+                name: hubChannelName,
+                type: 2,
+                parent: finalCategoryId || undefined
+            });
+            if (!createdVoice || !createdVoice.id) {
+                return res.status(502).json({ error: 'Discord client failed to create voice hub channel.' });
+            }
+            createdChannelId = String(createdVoice.id);
+            createdChannelName = createdVoice.name || hubChannelName;
+            if (!finalCategoryId && (createdVoice.parentId || createdVoice.parent_id)) {
+                finalCategoryId = String(createdVoice.parentId || createdVoice.parent_id);
+            }
+            createdVia = 'client';
+        } catch (err) {
+            return res.status(502).json({ error: `Failed to create voice hub via Discord client: ${err.message || 'Unknown error'}` });
+        }
+    }
+
+    // 2. Fallback to Discord REST API
+    if (!createdVia) {
+        const rawToken = process.env.DISCORD_TOKEN;
+        const botToken = rawToken ? rawToken.trim().replace(/^["']|["']$/g, '') : '';
+        if (!botToken) {
+            return res.status(400).json({ error: 'Bot is not connected to Discord and DISCORD_TOKEN is not configured.' });
+        }
+
+        try {
+            if (!finalCategoryId && newCategoryName) {
+                const catRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bot ${botToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: newCategoryName,
+                        type: 4
+                    })
+                });
+                if (!catRes.ok) {
+                    const errText = await catRes.text().catch(() => '');
+                    return res.status(502).json({ error: `Failed to create category in Discord: ${errText || catRes.status}` });
+                }
+                const catData = await catRes.json();
+                if (catData?.id) {
+                    finalCategoryId = String(catData.id);
+                    resolvedCategoryName = catData.name || newCategoryName;
+                }
+            }
+
+            const hubPayload = {
+                name: hubChannelName,
+                type: 2,
+                ...(finalCategoryId ? { parent_id: finalCategoryId } : {})
+            };
+            const chRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bot ${botToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(hubPayload)
+            });
+            if (!chRes.ok) {
+                const errText = await chRes.text().catch(() => '');
+                return res.status(502).json({ error: `Failed to create voice hub channel in Discord: ${errText || chRes.status}` });
+            }
+            const chData = await chRes.json();
+            if (!chData?.id) {
+                return res.status(502).json({ error: 'Discord API did not return a channel ID.' });
+            }
+            createdChannelId = String(chData.id);
+            createdChannelName = chData.name || hubChannelName;
+            if (!finalCategoryId && chData.parent_id) {
+                finalCategoryId = String(chData.parent_id);
+            }
+            createdVia = 'rest';
+        } catch (err) {
+            return res.status(502).json({ error: `Failed to communicate with Discord API: ${err.message || 'Network error'}` });
+        }
+    }
+
+    try {
+        const persistHubTx = db.transaction(() => {
+            db.prepare('INSERT OR REPLACE INTO voice_hubs (hubChannelId, guildId, categoryId) VALUES (?, ?, ?)').run(
+                createdChannelId,
+                guildId,
+                finalCategoryId || null
+            );
+            db.prepare('INSERT OR REPLACE INTO voice_guilds (guildId, hubChannelId, categoryId) VALUES (?, ?, ?)').run(
+                guildId,
+                createdChannelId,
+                finalCategoryId || null
+            );
+        });
+        persistHubTx();
+
+        if (!resolvedCategoryName) {
+            if (finalCategoryId) {
+                const cachedCat = clientGuild?.channels?.cache?.get?.(finalCategoryId);
+                resolvedCategoryName = cachedCat?.name || finalCategoryId;
+            } else {
+                resolvedCategoryName = 'No Category';
+            }
+        }
+
+        loggingService.recordAuditLog(guildId, {
+            eventType: 'log_events_channels',
+            title: 'Voice Hub Created',
+            description: `Created Join-to-Create voice hub **${createdChannelName}** (${createdChannelId})${resolvedCategoryName && resolvedCategoryName !== 'No Category' ? ` in category **${resolvedCategoryName}**` : ''}.`,
+            color: 0x57F287,
+            user: session.user,
+            guild: clientGuild,
+            client: discordClient
+        });
+
+        return res.status(201).json({
+            success: true,
+            hub: {
+                hubChannelId: createdChannelId,
+                guildId,
+                categoryId: finalCategoryId || null,
+                name: createdChannelName,
+                categoryName: resolvedCategoryName,
+                existsInDiscord: true
+            }
+        });
+    } catch (err) {
+        return res.status(500).json({ error: 'Failed to save voice hub configuration' });
     }
 });
 
@@ -959,16 +1319,18 @@ app.delete('/api/guilds/:guildId/voice/hubs/:hubChannelId', async (req, res) => 
         db.prepare('DELETE FROM voicemaster_guilds WHERE guildId = ? AND hubChannelId = ?').run(guildId, hubChannelId);
 
         // Delete from Discord if token is available
-        if (process.env.DISCORD_TOKEN) {
+        const rawToken = process.env.DISCORD_TOKEN;
+        const botToken = rawToken ? rawToken.trim().replace(/^["']|["']$/g, '') : '';
+        if (botToken) {
             await fetch(`https://discord.com/api/v10/channels/${hubChannelId}`, {
                 method: 'DELETE',
-                headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }
+                headers: { Authorization: `Bot ${botToken}` }
             }).catch(() => {});
 
             if (categoryId) {
                 await fetch(`https://discord.com/api/v10/channels/${categoryId}`, {
                     method: 'DELETE',
-                    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }
+                    headers: { Authorization: `Bot ${botToken}` }
                 }).catch(() => {});
             }
         }
@@ -976,6 +1338,457 @@ app.delete('/api/guilds/:guildId/voice/hubs/:hubChannelId', async (req, res) => 
         res.json({ success: true, deletedHubId: hubChannelId });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete voice hub' });
+    }
+});
+
+/* =========================================================
+   Moderation Warnings Routes
+   ========================================================= */
+
+app.get('/api/guilds/:guildId/warnings', (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId } = req.params;
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    try {
+        const rawPage = parseInt(String(req.query.page ?? '1'), 10);
+        const page = Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1;
+        const rawLimit = parseInt(String(req.query.limit ?? '20'), 10);
+        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20;
+        const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+        const userIdFilter = typeof req.query.userId === 'string' ? req.query.userId.trim() : '';
+
+        const rows = userIdFilter
+            ? db.prepare('SELECT * FROM warnings WHERE guildId = ? AND userId = ? ORDER BY id DESC').all(guildId, userIdFilter)
+            : db.prepare('SELECT * FROM warnings WHERE guildId = ? ORDER BY id DESC').all(guildId);
+
+        const guild = discordClient?.guilds?.cache?.get?.(guildId) || null;
+        const auditUserMap = new Map();
+        try {
+            const auditRows = db.prepare(`
+                SELECT userId, username, userTag FROM audit_logs
+                WHERE guildId = ? AND userId IS NOT NULL AND userId != ''
+                ORDER BY timestamp DESC, id DESC
+            `).all(guildId);
+            for (const ar of auditRows) {
+                if (auditUserMap.has(String(ar.userId))) continue;
+                const candidate = (ar.username && ar.username !== 'System')
+                    ? ar.username
+                    : (ar.userTag && ar.userTag !== 'System' ? ar.userTag : null);
+                if (candidate) {
+                    const cleaned = String(candidate).trim().replace(/^@+/, '').replace(/#0$/, '').trim();
+                    if (cleaned) {
+                        auditUserMap.set(String(ar.userId), cleaned);
+                    }
+                }
+            }
+        } catch {}
+
+        const resolveUsername = (id) => {
+            if (!id) return null;
+            const strId = String(id);
+            const member = guild?.members?.cache?.get?.(strId);
+            const memberName = member?.user?.username || member?.user?.tag || member?.user?.globalName || member?.displayName;
+            if (memberName) {
+                return String(memberName).replace(/^@+/, '').replace(/#0$/, '').trim() || null;
+            }
+            const cachedUser = discordClient?.users?.cache?.get?.(strId) || guild?.client?.users?.cache?.get?.(strId);
+            const cachedName = cachedUser?.username || cachedUser?.tag || cachedUser?.globalName;
+            if (cachedName) {
+                return String(cachedName).replace(/^@+/, '').replace(/#0$/, '').trim() || null;
+            }
+            if (discordClient?.user && String(discordClient.user.id) === strId && discordClient.user.username) {
+                return String(discordClient.user.username);
+            }
+            return auditUserMap.get(strId) || null;
+        };
+
+        const enriched = rows.map(w => ({
+            id: w.id,
+            guildId: w.guildId,
+            userId: w.userId,
+            username: resolveUsername(w.userId),
+            moderatorId: w.moderatorId,
+            moderatorName: resolveUsername(w.moderatorId),
+            reason: w.reason ?? '',
+            timestamp: w.timestamp
+        }));
+
+        const needle = search.toLowerCase();
+        const filtered = needle
+            ? enriched.filter(w => [
+                String(w.id),
+                w.userId || '',
+                w.moderatorId || '',
+                w.reason || '',
+                w.username || '',
+                w.moderatorName || ''
+            ].some(field => String(field).toLowerCase().includes(needle)))
+            : enriched;
+
+        const total = filtered.length;
+        const totalPages = Math.max(1, Math.ceil(total / limit));
+        const offset = (page - 1) * limit;
+        const pagedRows = filtered.slice(offset, offset + limit);
+
+        res.json({
+            warnings: pagedRows,
+            total,
+            page,
+            limit,
+            totalPages
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to retrieve moderation warnings' });
+    }
+});
+
+app.delete('/api/guilds/:guildId/warnings/:warningId', (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId, warningId } = req.params;
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    try {
+        const numericId = Number(warningId);
+        if (!Number.isInteger(numericId) || numericId <= 0) {
+            return res.status(404).json({ error: 'Warning not found' });
+        }
+
+        const existing = db.prepare('SELECT * FROM warnings WHERE id = ? AND guildId = ?').get(numericId, guildId);
+        if (!existing) {
+            return res.status(404).json({ error: 'Warning not found' });
+        }
+
+        db.prepare('DELETE FROM warnings WHERE id = ? AND guildId = ?').run(numericId, guildId);
+
+        const guild = discordClient?.guilds?.cache?.get?.(guildId) || null;
+        loggingService.recordAuditLog(guildId, {
+            eventType: 'log_events_moderation',
+            title: 'Warning Revoked',
+            description: `Revoked warning **#${numericId}** for <@${existing.userId}>${existing.reason ? ` (Reason: ${existing.reason})` : ''}.`,
+            color: 0xFEE75C,
+            user: session.user,
+            guild,
+            client: discordClient
+        });
+
+        res.json({ success: true, deletedId: numericId });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to revoke warning' });
+    }
+});
+
+/* =========================================================
+   Economy Server Shop Routes
+   ========================================================= */
+
+function enrichShopItemRow(row, guildId, guild) {
+    const purchaseRow = db.prepare(
+        'SELECT COALESCE(SUM(quantity), 0) AS count FROM user_inventory WHERE guildId = ? AND itemId = ?'
+    ).get(guildId, row.id);
+    const purchaseCount = Number(purchaseRow?.count || 0);
+
+    let roleName = null;
+    let roleColor = null;
+    if (row.roleId) {
+        const role = guild?.roles?.cache?.get?.(row.roleId);
+        if (role) {
+            roleName = role.name || null;
+            if (typeof role.hexColor === 'string' && role.hexColor !== '#000000') {
+                roleColor = role.hexColor;
+            } else if (typeof role.color === 'string' && role.color !== '#000000') {
+                roleColor = role.color;
+            } else if (typeof role.color === 'number' && role.color > 0) {
+                roleColor = `#${role.color.toString(16).padStart(6, '0')}`;
+            }
+        }
+    }
+
+    return {
+        id: row.id,
+        guildId: row.guildId,
+        name: row.name,
+        description: row.description ?? '',
+        price: Number(row.price),
+        roleId: row.roleId || '',
+        roleName,
+        roleColor,
+        stock: Number(row.stock),
+        purchaseCount,
+        createdAt: row.createdAt
+    };
+}
+
+function parseShopInt(rawVal) {
+    if (typeof rawVal === 'number') {
+        return Number.isFinite(rawVal) && Number.isInteger(rawVal) ? rawVal : Number.NaN;
+    }
+    if (typeof rawVal === 'string' && rawVal.trim() !== '') {
+        const num = Number(rawVal.trim());
+        return Number.isFinite(num) && Number.isInteger(num) ? num : Number.NaN;
+    }
+    return Number.NaN;
+}
+
+app.get('/api/guilds/:guildId/shop', (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId } = req.params;
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    try {
+        const guild = discordClient?.guilds?.cache?.get?.(guildId) || null;
+        const rows = db.prepare('SELECT * FROM shop_items WHERE guildId = ? ORDER BY price ASC, id ASC').all(guildId);
+        const items = rows.map(row => enrichShopItemRow(row, guildId, guild));
+        res.json({ items });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to retrieve shop items' });
+    }
+});
+
+app.post('/api/guilds/:guildId/shop', (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId } = req.params;
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return res.status(400).json({ error: 'Request body must be a JSON object.' });
+    }
+
+    if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 100) {
+        return res.status(400).json({ error: 'Item name is required and must be 1-100 characters.' });
+    }
+    const cleanName = body.name.trim();
+
+    if (body.description !== undefined && body.description !== null && typeof body.description !== 'string') {
+        return res.status(400).json({ error: 'Description must be a string.' });
+    }
+    const cleanDescription = typeof body.description === 'string' ? body.description.trim() : '';
+    if (cleanDescription.length > 500) {
+        return res.status(400).json({ error: 'Description must be 500 characters or fewer.' });
+    }
+
+    const cleanPrice = parseShopInt(body.price);
+    if (Number.isNaN(cleanPrice) || cleanPrice < 0) {
+        return res.status(400).json({ error: 'Price must be an integer >= 0.' });
+    }
+
+    if (body.roleId !== undefined && body.roleId !== null && typeof body.roleId !== 'string') {
+        return res.status(400).json({ error: 'roleId must be a string.' });
+    }
+    const cleanRoleId = typeof body.roleId === 'string'
+        ? body.roleId.replace(/^["']|["']$/g, '').trim()
+        : '';
+
+    let cleanStock = -1;
+    if (body.stock !== undefined && body.stock !== null && body.stock !== '') {
+        cleanStock = parseShopInt(body.stock);
+        if (Number.isNaN(cleanStock) || cleanStock < -1) {
+            return res.status(400).json({ error: 'Stock must be an integer >= -1.' });
+        }
+    }
+
+    try {
+        const createdAt = Date.now();
+        const info = db.prepare(`
+            INSERT INTO shop_items (guildId, name, description, price, roleId, stock, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(guildId, cleanName, cleanDescription, cleanPrice, cleanRoleId, cleanStock, createdAt);
+
+        const guild = discordClient?.guilds?.cache?.get?.(guildId) || null;
+        const insertedRow = db.prepare('SELECT * FROM shop_items WHERE id = ? AND guildId = ?').get(Number(info.lastInsertRowid), guildId);
+        const item = enrichShopItemRow(insertedRow, guildId, guild);
+
+        loggingService.recordAuditLog(guildId, {
+            eventType: 'log_events_dashboard',
+            title: 'Shop Item Created',
+            description: `Added shop item **${cleanName}** for **${cleanPrice}** coins${cleanRoleId ? ` (Role: <@&${cleanRoleId}>)` : ''}.`,
+            color: 0xF1C40F,
+            user: session.user,
+            guild,
+            client: discordClient
+        });
+
+        res.status(201).json({ success: true, item });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create shop item' });
+    }
+});
+
+app.put('/api/guilds/:guildId/shop/:itemId', (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId, itemId } = req.params;
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    const numericId = Number(itemId);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+        return res.status(404).json({ error: 'Shop item not found' });
+    }
+
+    const existing = db.prepare('SELECT * FROM shop_items WHERE id = ? AND guildId = ?').get(numericId, guildId);
+    if (!existing) {
+        return res.status(404).json({ error: 'Shop item not found' });
+    }
+
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return res.status(400).json({ error: 'Request body must be a JSON object.' });
+    }
+
+    let nextName = existing.name;
+    if (body.name !== undefined) {
+        if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 100) {
+            return res.status(400).json({ error: 'Item name must be 1-100 characters.' });
+        }
+        nextName = body.name.trim();
+    }
+
+    let nextDescription = existing.description ?? '';
+    if (body.description !== undefined) {
+        if (body.description !== null && typeof body.description !== 'string') {
+            return res.status(400).json({ error: 'Description must be a string.' });
+        }
+        nextDescription = typeof body.description === 'string' ? body.description.trim() : '';
+        if (nextDescription.length > 500) {
+            return res.status(400).json({ error: 'Description must be 500 characters or fewer.' });
+        }
+    }
+
+    let nextPrice = Number(existing.price);
+    if (body.price !== undefined) {
+        nextPrice = parseShopInt(body.price);
+        if (Number.isNaN(nextPrice) || nextPrice < 0) {
+            return res.status(400).json({ error: 'Price must be an integer >= 0.' });
+        }
+    }
+
+    let nextRoleId = existing.roleId || '';
+    if (body.roleId !== undefined) {
+        if (body.roleId !== null && typeof body.roleId !== 'string') {
+            return res.status(400).json({ error: 'roleId must be a string.' });
+        }
+        nextRoleId = typeof body.roleId === 'string'
+            ? body.roleId.replace(/^["']|["']$/g, '').trim()
+            : '';
+    }
+
+    let nextStock = Number(existing.stock);
+    if (body.stock !== undefined) {
+        if (body.stock === null || body.stock === '') {
+            nextStock = -1;
+        } else {
+            nextStock = parseShopInt(body.stock);
+            if (Number.isNaN(nextStock) || nextStock < -1) {
+                return res.status(400).json({ error: 'Stock must be an integer >= -1.' });
+            }
+        }
+    }
+
+    try {
+        db.prepare(`
+            UPDATE shop_items
+            SET name = ?, description = ?, price = ?, roleId = ?, stock = ?
+            WHERE id = ? AND guildId = ?
+        `).run(nextName, nextDescription, nextPrice, nextRoleId, nextStock, numericId, guildId);
+
+        const guild = discordClient?.guilds?.cache?.get?.(guildId) || null;
+        const updatedRow = db.prepare('SELECT * FROM shop_items WHERE id = ? AND guildId = ?').get(numericId, guildId);
+        const item = enrichShopItemRow(updatedRow, guildId, guild);
+
+        loggingService.recordAuditLog(guildId, {
+            eventType: 'log_events_dashboard',
+            title: 'Shop Item Updated',
+            description: `Updated shop item **${nextName}** (#${numericId}) — **${nextPrice}** coins.`,
+            color: 0xF1C40F,
+            user: session.user,
+            guild,
+            client: discordClient
+        });
+
+        res.json({ success: true, item });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update shop item' });
+    }
+});
+
+app.delete('/api/guilds/:guildId/shop/:itemId', (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId, itemId } = req.params;
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    const numericId = Number(itemId);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+        return res.status(404).json({ error: 'Shop item not found' });
+    }
+
+    const existing = db.prepare('SELECT * FROM shop_items WHERE id = ? AND guildId = ?').get(numericId, guildId);
+    if (!existing) {
+        return res.status(404).json({ error: 'Shop item not found' });
+    }
+
+    try {
+        const deleteTx = db.transaction(() => {
+            db.prepare('DELETE FROM user_inventory WHERE guildId = ? AND itemId = ?').run(guildId, numericId);
+            db.prepare('DELETE FROM shop_items WHERE id = ? AND guildId = ?').run(numericId, guildId);
+        });
+        deleteTx();
+
+        const guild = discordClient?.guilds?.cache?.get?.(guildId) || null;
+        loggingService.recordAuditLog(guildId, {
+            eventType: 'log_events_dashboard',
+            title: 'Shop Item Deleted',
+            description: `Removed shop item **${existing.name}** (#${numericId}) from the server shop.`,
+            color: 0xED4245,
+            user: session.user,
+            guild,
+            client: discordClient
+        });
+
+        res.json({ success: true, deletedId: numericId });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete shop item' });
     }
 });
 

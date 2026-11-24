@@ -3,6 +3,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import db from '../../../lib/database.js';
+import { SettingsManager } from '../../../lib/settings.js';
+
+function resolveGameRoleColor(guildId, fallbackColor) {
+    try {
+        if (typeof SettingsManager.getEmbedColor === 'function') {
+            return SettingsManager.getEmbedColor(guildId, 'gamerole', fallbackColor);
+        }
+    } catch {}
+    return fallbackColor;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultWhitelistPath = path.join(__dirname, '..', 'defaultWhitelist.json');
@@ -173,7 +183,7 @@ export default {
             const embed = new EmbedBuilder()
                 .setTitle(`🎮 GameRole Whitelist`)
                 .setDescription(description.slice(0, 4000))
-                .setColor(0x5865F2)
+                .setColor(resolveGameRoleColor(guildId, 0x5865F2))
                 .setFooter({ text: `${interaction.guild.name} • Total ${customRows.length + defaultGames.length} active games • Page ${validPage} of ${totalDefaultPages}` })
                 .setTimestamp();
 
@@ -192,7 +202,7 @@ export default {
                     { name: 'Role Prefix', value: '`PLAYING `', inline: true },
                     { name: 'How It Works', value: 'When a member starts playing any whitelisted game, the bot checks for a corresponding role, creates it if needed, and assigns it. When they stop or switch games, the role is removed automatically.' }
                 )
-                .setColor(0xED4245)
+                .setColor(resolveGameRoleColor(guildId, 0xED4245))
                 .setFooter({ text: 'SugoiBot GameRole' });
 
             return interaction.reply({ embeds: [embed] });

@@ -3,7 +3,8 @@ import db from '../../../lib/database.js';
 import {
     getVoiceRecord,
     getVoiceHubConfig,
-    saveUserVoiceSettings
+    saveUserVoiceSettings,
+    resolveVoiceEmbedColor
 } from '../lib/voiceHelper.js';
 
 export default {
@@ -124,6 +125,8 @@ export default {
             const voiceChannel = interaction.member.voice?.channel;
             const record = voiceChannel ? getVoiceRecord(voiceChannel.id) : null;
 
+            const voiceEmbedColor = resolveVoiceEmbedColor(guild.id, 0x5865F2);
+
             if (record && voiceChannel) {
                 const embed = new EmbedBuilder()
                     .setTitle(`🔊 ${voiceChannel.name}`)
@@ -132,7 +135,7 @@ export default {
                         { name: 'Participants', value: `${voiceChannel.members.size} / ${voiceChannel.userLimit || '∞'}`, inline: true },
                         { name: 'Bitrate', value: `${voiceChannel.bitrate / 1000} kbps`, inline: true }
                     )
-                    .setColor(0x5865F2)
+                    .setColor(voiceEmbedColor)
                     .setFooter({ text: 'Active Room Details' });
 
                 return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -163,7 +166,7 @@ export default {
                     { name: `Active Temporary Rooms (${activeRooms.length})`, value: roomsList.slice(0, 1024), inline: false },
                     { name: 'Control Panel', value: 'Sent inside each temporary voice room chat box upon creation', inline: false }
                 )
-                .setColor(0x5865F2)
+                .setColor(voiceEmbedColor)
                 .setFooter({ text: guild.name })
                 .setTimestamp();
 

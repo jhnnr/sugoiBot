@@ -14,14 +14,20 @@ vi.mock('../lib/bot/loggingService.js', () => ({
     },
 }));
 
-vi.mock('../lib/settings.js', () => ({
-    SettingsManager: {
-        getGuildJson: vi.fn().mockReturnValue(true),
-        setGuildJson: vi.fn().mockReturnValue(true),
-        getGuild: vi.fn().mockReturnValue('log_ch_1'),
-        get: vi.fn().mockReturnValue('log_ch_1')
-    },
-}));
+vi.mock('../lib/settings.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        SettingsManager: {
+            ...actual.SettingsManager,
+            getGuildJson: vi.fn().mockReturnValue(true),
+            setGuildJson: vi.fn().mockReturnValue(true),
+            getGuild: vi.fn().mockReturnValue('log_ch_1'),
+            get: vi.fn().mockReturnValue('log_ch_1'),
+            getEmbedColor: vi.fn((guildId, mod, fallback = 0x5865F2) => fallback)
+        },
+    };
+});
 
 describe('Core Module Events', () => {
     beforeEach(() => {
@@ -435,6 +441,151 @@ describe('Core Module Events', () => {
             setSpy.mockRestore();
             getSpy.mockRestore();
         });
+
+        it('should set multiple roles with deduplication via role..role5 options', async () => {
+            const { default: cmdpermCommand } = await import('../modules/core/commands/cmdperm.js');
+            const setSpy = vi.spyOn(SettingsManager, 'setGuildJson').mockReturnValue();
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockReturnValue({});
+
+            const rolesMap = {
+                role: { id: 'role_mod' },
+                role2: { id: 'role_trial_mod' },
+                role3: { id: 'role_mod' }, // duplicate should be ignored
+                role4: null,
+                role5: { id: 'role_helper' }
+            };
+            const reply = vi.fn();
+            const interaction = {
+                guild: { id: 'g400' },
+                options: {
+                    getSubcommand: () => 'set',
+                    getString: () => '/voice lock',
+                    getRole: (name) => rolesMap[name] || null
+                },
+                reply
+            };
+
+            await cmdpermCommand.execute(interaction);
+
+            expect(setSpy).toHaveBeenCalledWith('g400', 'command_roles', {
+                'voice lock': ['role_mod', 'role_trial_mod', 'role_helper']
+            });
+            expect(reply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('requires one of the following roles to execute: <@&role_mod>, <@&role_trial_mod>, <@&role_helper>'),
+                ephemeral: true
+            }));
+
+            setSpy.mockRestore();
+            getSpy.mockRestore();
+        });
+
+        it('should add and remove roles on a command and reset when the last role is removed', async () => {
+            const { default: cmdpermCommand } = await import('../modules/core/commands/cmdperm.js');
+            let storedRoles = { ban: 'role_mod' };
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockImplementation(() => storedRoles);
+            const setSpy = vi.spyOn(SettingsManager, 'setGuildJson').mockImplementation((gId, key, val) => {
+                storedRoles = { ...val };
+            });
+
+            // 1. Add second role to existing single-role command
+            const addReply = vi.fn();
+            await cmdpermCommand.execute({
+                guild: { id: 'g400' },
+                options: {
+                    getSubcommand: () => 'add',
+                    getString: () => 'ban',
+                    getRole: () => ({ id: 'role_admin_jr' })
+                },
+                reply: addReply
+            });
+            expect(storedRoles.ban).toEqual(['role_mod', 'role_admin_jr']);
+            expect(addReply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('Allowed roles: <@&role_mod>, <@&role_admin_jr>'),
+                ephemeral: true
+            }));
+
+            // 2. Remove non-existent role returns informational notice without mutating
+            const missingRemoveReply = vi.fn();
+            await cmdpermCommand.execute({
+                guild: { id: 'g400' },
+                options: {
+                    getSubcommand: () => 'remove',
+                    getString: () => 'ban',
+                    getRole: () => ({ id: 'role_other' })
+                },
+                reply: missingRemoveReply
+            });
+            expect(storedRoles.ban).toEqual(['role_mod', 'role_admin_jr']);
+            expect(missingRemoveReply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('is not currently configured'),
+                ephemeral: true
+            }));
+
+            // 3. Remove first role -> keeps remaining ['role_admin_jr']
+            const firstRemoveReply = vi.fn();
+            await cmdpermCommand.execute({
+                guild: { id: 'g400' },
+                options: {
+                    getSubcommand: () => 'remove',
+                    getString: () => 'ban',
+                    getRole: () => ({ id: 'role_mod' })
+                },
+                reply: firstRemoveReply
+            });
+            expect(storedRoles.ban).toEqual(['role_admin_jr']);
+            expect(firstRemoveReply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('Remaining allowed roles: <@&role_admin_jr>'),
+                ephemeral: true
+            }));
+
+            // 4. Remove final role -> deletes command key and resets to Everyone
+            const finalRemoveReply = vi.fn();
+            await cmdpermCommand.execute({
+                guild: { id: 'g400' },
+                options: {
+                    getSubcommand: () => 'remove',
+                    getString: () => 'ban',
+                    getRole: () => ({ id: 'role_admin_jr' })
+                },
+                reply: finalRemoveReply
+            });
+            expect(storedRoles).toEqual({});
+            expect(finalRemoveReply).toHaveBeenCalledWith(expect.objectContaining({
+                content: expect.stringContaining('Reset to default permissions'),
+                ephemeral: true
+            }));
+
+            setSpy.mockRestore();
+            getSpy.mockRestore();
+        });
+
+        it('should list single and multi-role command permissions with custom core embed color', async () => {
+            const { default: cmdpermCommand } = await import('../modules/core/commands/cmdperm.js');
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockReturnValue({
+                ban: 'role_mod',
+                'voice lock': ['role_dj', 'role_vip']
+            });
+            const colorSpy = vi.spyOn(SettingsManager, 'getEmbedColor').mockReturnValue(0xABCDEF);
+
+            const reply = vi.fn();
+            await cmdpermCommand.execute({
+                guild: { id: 'g400', name: 'Test Guild' },
+                options: {
+                    getSubcommand: () => 'list'
+                },
+                reply
+            });
+
+            expect(colorSpy).toHaveBeenCalledWith('g400', 'core', 0x5865F2);
+            expect(reply).toHaveBeenCalledTimes(1);
+            const embedJson = reply.mock.calls[0][0].embeds[0].toJSON();
+            expect(embedJson.color).toBe(0xABCDEF);
+            expect(embedJson.description).toContain('`/ban` → Requires <@&role_mod>');
+            expect(embedJson.description).toContain('`/voice lock` → Requires <@&role_dj>, <@&role_vip>');
+
+            colorSpy.mockRestore();
+            getSpy.mockRestore();
+        });
     });
 
     describe('interactionCreate command_roles gating', () => {
@@ -572,6 +723,140 @@ describe('Core Module Events', () => {
                 ephemeral: true
             }));
             expect(mockCommand.execute).not.toHaveBeenCalled();
+
+            getSpy.mockRestore();
+        });
+
+        it('should allow execution when user holds ANY role in a multi-role command_roles array and block with multi-role message when holding none', async () => {
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockImplementation((guildId, key) => {
+                if (key === 'command_roles') return { ban: ['role_sr_mod', 'role_jr_mod'] };
+                return true;
+            });
+
+            const mockCommand = { data: { name: 'ban' }, execute: vi.fn(), module: 'moderation' };
+
+            // 1. User holds none of the required roles -> blocked with multi-role list
+            const deniedReply = vi.fn();
+            await interactionCreateEvent.execute({
+                isChatInputCommand: () => true,
+                commandName: 'ban',
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user_no_role' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map([['unrelated_role', { id: 'unrelated_role' }]]) }
+                },
+                client: {
+                    commands: new Map([['ban', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply: deniedReply
+            });
+
+            expect(deniedReply).toHaveBeenCalledWith({
+                content: '⚠️ You need one of the following roles to use `/ban`: <@&role_sr_mod>, <@&role_jr_mod>.',
+                ephemeral: true
+            });
+            expect(mockCommand.execute).not.toHaveBeenCalled();
+
+            // 2. User holds the second role in the array -> allowed
+            const allowedReply = vi.fn();
+            await interactionCreateEvent.execute({
+                isChatInputCommand: () => true,
+                commandName: 'ban',
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user_jr_mod' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map([['role_jr_mod', { id: 'role_jr_mod' }]]) }
+                },
+                client: {
+                    commands: new Map([['ban', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply: allowedReply
+            });
+
+            expect(mockCommand.execute).toHaveBeenCalledTimes(1);
+
+            getSpy.mockRestore();
+        });
+
+        it('should enforce subcommand multi-role array override over parent command multi-role array', async () => {
+            const getSpy = vi.spyOn(SettingsManager, 'getGuildJson').mockImplementation((guildId, key) => {
+                if (key === 'command_roles') {
+                    return {
+                        voice: ['role_voice_parent_1', 'role_voice_parent_2'],
+                        'voice lock': ['role_lock_vip_1', 'role_lock_vip_2']
+                    };
+                }
+                return true;
+            });
+
+            const mockCommand = { data: { name: 'voice' }, execute: vi.fn(), module: 'voice' };
+
+            // User only has parent role -> blocked from '/voice lock' due to subcommand array override
+            const deniedSubReply = vi.fn();
+            await interactionCreateEvent.execute({
+                isChatInputCommand: () => true,
+                commandName: 'voice',
+                options: { getSubcommand: () => 'lock' },
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user_parent_only' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map([['role_voice_parent_1', { id: 'role_voice_parent_1' }]]) }
+                },
+                client: {
+                    commands: new Map([['voice', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply: deniedSubReply
+            });
+
+            expect(deniedSubReply).toHaveBeenCalledWith({
+                content: '⚠️ You need one of the following roles to use `/voice lock`: <@&role_lock_vip_1>, <@&role_lock_vip_2>.',
+                ephemeral: true
+            });
+            expect(mockCommand.execute).not.toHaveBeenCalled();
+
+            // Same user uses '/voice rename' (no subcommand override) -> falls back to parent multi-role array and succeeds
+            await interactionCreateEvent.execute({
+                isChatInputCommand: () => true,
+                commandName: 'voice',
+                options: { getSubcommand: () => 'rename' },
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user_parent_only' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map([['role_voice_parent_1', { id: 'role_voice_parent_1' }]]) }
+                },
+                client: {
+                    commands: new Map([['voice', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply: vi.fn()
+            });
+            expect(mockCommand.execute).toHaveBeenCalledTimes(1);
+
+            // User holding second subcommand role -> allowed for '/voice lock'
+            await interactionCreateEvent.execute({
+                isChatInputCommand: () => true,
+                commandName: 'voice',
+                options: { getSubcommand: () => 'lock' },
+                guild: { id: 'g400', ownerId: 'owner999' },
+                user: { id: 'user_sub_vip_2' },
+                member: {
+                    permissions: { has: vi.fn().mockReturnValue(false) },
+                    roles: { cache: new Map([['role_lock_vip_2', { id: 'role_lock_vip_2' }]]) }
+                },
+                client: {
+                    commands: new Map([['voice', mockCommand]]),
+                    cooldowns: new Map()
+                },
+                reply: vi.fn()
+            });
+            expect(mockCommand.execute).toHaveBeenCalledTimes(2);
 
             getSpy.mockRestore();
         });

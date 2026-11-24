@@ -692,18 +692,21 @@ describe('CLI --extract-notes integration', () => {
 });
 
 describe('live repository CHANGELOG.md integration', () => {
-    it('extracts a non-empty changelog section from the real CHANGELOG.md for the current package.json version (1.3.3)', () => {
+    it('validates current package.json version and extracts stable sections (1.3.3 & 1.0.0) from real CHANGELOG.md', () => {
         const rootDir = path.resolve(__dirname, '..');
         const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
         const changelogContent = fs.readFileSync(path.join(rootDir, 'CHANGELOG.md'), 'utf-8');
 
-        expect(pkg.version).toBe('1.3.3');
+        const evalResult = evaluateReleaseVersion({ version: pkg.version });
+        expect(evalResult.version).toBe(pkg.version);
+        expect(evalResult.isDev !== evalResult.isStable).toBe(true);
+
         expect(changelogContent).not.toContain('## [Unreleased]');
         expect(changelogContent).not.toContain('[Unreleased]:');
         expect(changelogContent).toContain('https://github.com/jhnnr/sugoiBot/compare/');
 
-        const sectionPlain = extractChangelogSection(changelogContent, pkg.version);
-        const sectionPrefixed = extractChangelogSection(changelogContent, `v${pkg.version}`);
+        const sectionPlain = extractChangelogSection(changelogContent, '1.3.3');
+        const sectionPrefixed = extractChangelogSection(changelogContent, 'v1.3.3');
         const oldestSection = extractChangelogSection(changelogContent, '1.0.0');
 
         expect(sectionPlain.length).toBeGreaterThan(0);
@@ -716,13 +719,22 @@ describe('live repository CHANGELOG.md integration', () => {
         expect(oldestSection).not.toContain('[v1.0.0]:');
         expect(oldestSection).not.toContain('[v1.3.3]:');
 
+        if (evalResult.isStable) {
+            expect(extractChangelogSection(changelogContent, pkg.version).length).toBeGreaterThan(0);
+        } else {
+            expect(extractChangelogSection(changelogContent, pkg.version)).toBe('');
+        }
+
+        const cliTargetVersion = evalResult.isStable ? pkg.version : '1.3.3';
+        const expectedNotes = extractChangelogSection(changelogContent, cliTargetVersion);
+
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sugoibot-live-changelog-'));
         const notesFile = path.join(tmpDir, 'release-notes.md');
         const ghOutputFile = path.join(tmpDir, 'github-output.txt');
         const scriptPath = path.join(rootDir, 'scripts', 'release-version.js');
 
         try {
-            execFileSync(process.execPath, [scriptPath, '--extract-notes', notesFile], {
+            execFileSync(process.execPath, [scriptPath, '--extract-notes', notesFile, '--version', cliTargetVersion], {
                 env: {
                     ...process.env,
                     GITHUB_OUTPUT: ghOutputFile
@@ -730,7 +742,7 @@ describe('live repository CHANGELOG.md integration', () => {
                 encoding: 'utf-8'
             });
 
-            expect(fs.readFileSync(notesFile, 'utf-8')).toBe(`${sectionPlain}\n`);
+            expect(fs.readFileSync(notesFile, 'utf-8')).toBe(`${expectedNotes}\n`);
             expect(fs.readFileSync(ghOutputFile, 'utf-8').trim().split(/\r?\n/)).toEqual([
                 'has_release_notes=true',
                 `notes_file=${notesFile}`

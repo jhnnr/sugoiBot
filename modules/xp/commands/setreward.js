@@ -86,10 +86,17 @@ export default {
                 return `• **Level ${lvl}** &rarr; <@&${roleId}> (\`${roleId}\`)`;
             });
 
+            let embedColor = 0xFEE75C;
+            try {
+                if (typeof SettingsManager.getEmbedColor === 'function') {
+                    embedColor = SettingsManager.getEmbedColor(guildId, 'xp', 0xFEE75C);
+                }
+            } catch {}
+
             const embed = new EmbedBuilder()
                 .setTitle(`⭐ Level Role Rewards (${entries.length})`)
                 .setDescription(descriptionLines.join('\n'))
-                .setColor(0xFEE75C)
+                .setColor(embedColor)
                 .setFooter({ text: interaction.guild.name })
                 .setTimestamp();
 

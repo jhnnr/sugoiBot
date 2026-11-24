@@ -1,10 +1,20 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import db from '../../../lib/database.js';
+import { SettingsManager } from '../../../lib/settings.js';
+
+export function resolveVoiceEmbedColor(guildId, fallbackColor = 0x5865F2) {
+    try {
+        if (typeof SettingsManager.getEmbedColor === 'function') {
+            return SettingsManager.getEmbedColor(guildId, 'voice', fallbackColor);
+        }
+    } catch {}
+    return fallbackColor;
+}
 
 /**
  * Creates the interactive voice interface embed sent inside the voice channel's chat
  */
-export function createVoiceInterfaceEmbed() {
+export function createVoiceInterfaceEmbed(guildId = null) {
     return new EmbedBuilder()
         .setTitle('🔊 Voice Room Controls')
         .setDescription(
@@ -18,7 +28,7 @@ export function createVoiceInterfaceEmbed() {
             '👑 **Claim** • Takes ownership if the original host leaves\n' +
             'ℹ️ **Info** • Shows room statistics and ownership'
         )
-        .setColor(0x5865F2)
+        .setColor(resolveVoiceEmbedColor(guildId, 0x5865F2))
         .setFooter({ text: 'Temporary Voice Rooms' });
 }
 

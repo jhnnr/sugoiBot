@@ -27,7 +27,7 @@ function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch }) {
         let rem = part.trim();
         if (!rem) return false;
 
-        const attrRegex = /\[([a-zA-Z0-9_-]+)=(?:"([^"]*)"|'([^']*)'|([^\]]*))\]/g;
+        const attrRegex = /\[([a-zA-Z0-9_:-]+)=(?:"([^"]*)"|'([^']*)'|([^\]]*))\]/g;
         let m;
         while ((m = attrRegex.exec(rem)) !== null) {
             const attrName = m[1];
@@ -35,6 +35,12 @@ function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch }) {
             if (el.getAttribute(attrName) !== attrVal) return false;
         }
         rem = rem.replace(attrRegex, '');
+
+        const bareAttrRegex = /\[([a-zA-Z0-9_:-]+)\]/g;
+        while ((m = bareAttrRegex.exec(rem)) !== null) {
+            if (!el.attributes.has(m[1])) return false;
+        }
+        rem = rem.replace(bareAttrRegex, '');
 
         const idMatches = [...rem.matchAll(/#([a-zA-Z0-9_-]+)/g)];
         for (const idMatch of idMatches) {
@@ -287,10 +293,14 @@ function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch }) {
         }
 
         focus() {
+            document.activeElement = this;
             this.dispatchEvent({ type: 'focus', bubbles: false, target: this });
         }
 
         blur() {
+            if (document.activeElement === this) {
+                document.activeElement = null;
+            }
             this.dispatchEvent({ type: 'blur', bubbles: false, target: this });
         }
 
@@ -373,6 +383,7 @@ function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch }) {
 
     const document = {
         body,
+        activeElement: null,
         listeners: new Map(),
         getElementById(id) {
             for (const el of allElements) {
@@ -432,6 +443,9 @@ function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch }) {
 
     const instrumentedScript = `${scriptMatch[1].replace(/checkAuth\(\);\s*$/, '')}
 window.__dashboardTestApi = {
+    ...(window.__dashboardTestApi || {}),
+    checkAuth,
+    loadGuilds,
     captureFormState,
     isFormDirty,
     checkFormChanges,
@@ -455,17 +469,7 @@ window.__dashboardTestApi = {
     formatAuditDescription,
     renderAuditLogs,
     appendAuditLogEntry,
-    loadAuditLogs,
-    getState: () => ({
-        currentGuildId,
-        originalFormState,
-        initialFormState,
-        hasUserEditedForm,
-        isSwitchingGuild,
-        currentRoleRewards,
-        currentCommandRoles,
-        auditLogsCache
-    })
+    loadAuditLogs
 };
 `;
 
@@ -1068,55 +1072,73 @@ describe('Dashboard API', () => {
             return { testGuildId, cookieHeader, ...harness };
         }
 
-        it('clicking gear buttons and opening/closing any module modal never marks the form dirty or shows #floatingSaveBar', async () => {
+        it('clicking Overview gear buttons navigates to per-module workspaces cleanly without marking form dirty, and #confirmModal locks/restores body scroll', async () => {
             const { document, api } = await setupAuthenticatedDashboard();
             const saveBar = document.getElementById('floatingSaveBar');
+            const settingsCard = document.getElementById('settingsCard');
+            const modulesNavToggle = document.getElementById('modulesNavToggle');
+            const modulesSubnav = document.getElementById('modulesSubnav');
 
             expect(api.isFormDirty()).toBe(false);
             expect(api.checkFormDirty()).toBe(false);
             expect(saveBar.classList.contains('visible')).toBe(false);
             expect(api.captureFormState()).toEqual(api.getState().initialFormState);
+            expect(settingsCard.style.display).toBe('block');
 
-            const modalIds = [
-                'generalModal',
-                'economyModal',
-                'moderationModal',
-                'xpModal',
-                'gameroleModal',
-                'voiceModal'
-            ];
+            const moduleKeys = ['general', 'economy', 'moderation', 'xp', 'gamerole', 'voice'];
 
-            for (const modalId of modalIds) {
-                const gearBtn = document.querySelector(`[onclick="openModal('${modalId}')"]`);
+            for (const mod of moduleKeys) {
+                await api.setWorkspaceView('all');
+                expect(settingsCard.style.display).toBe('block');
+
+                const gearBtn = document.querySelector(`.module-settings-btn[data-module-gear="${mod}"]`);
                 expect(gearBtn).not.toBeNull();
 
-                // Click gear button (triggers both bubbling document click listeners and openModal)
+                // Click gear button on Overview -> navigates to #moduleWorkspace_<mod>, auto-expands #modulesSubnav, never marks form dirty
                 await gearBtn.click();
 
-                const modalEl = document.getElementById(modalId);
-                expect(modalEl.style.display).toBe('flex');
-                expect(document.body.style.overflow).toBe('hidden');
-                expect(api.isFormDirty()).toBe(false);
-                expect(saveBar.classList.contains('visible')).toBe(false);
-
-                // Close modal via closeModal
-                api.closeModal(modalId);
-                expect(modalEl.style.display).toBe('none');
+                const panelEl = document.getElementById(`moduleWorkspace_${mod}`);
+                expect(panelEl).not.toBeNull();
+                expect(panelEl.style.display).toBe('block');
+                expect(settingsCard.style.display).toBe('none');
+                expect(modulesNavToggle.getAttribute('aria-expanded')).toBe('true');
+                expect(modulesSubnav.style.display).toBe('flex');
+                expect(document.querySelector(`.workspace-subnav-btn[data-module-nav="${mod}"]`).classList.contains('active')).toBe(true);
                 expect(document.body.style.overflow).toBe('');
                 expect(api.isFormDirty()).toBe(false);
                 expect(api.checkFormDirty()).toBe(false);
                 expect(saveBar.classList.contains('visible')).toBe(false);
                 expect(api.captureFormState()).toEqual(api.getState().initialFormState);
-
-                // Also test opening and closing via modal backdrop click
-                await gearBtn.click();
-                modalEl.dispatchEvent({ type: 'click', bubbles: true, target: modalEl });
-                expect(modalEl.style.display).toBe('none');
-                expect(api.isFormDirty()).toBe(false);
-                expect(saveBar.classList.contains('visible')).toBe(false);
             }
 
-            // Ensure subcommand role override ('voice lock' -> '444444444444444444') was not overwritten by parent command cascade on outside clicks
+            // Backwards-safe openModal('<mod>Modal') routes to module workspace cleanly
+            await api.openModal('xpModal');
+            expect(document.getElementById('moduleWorkspace_xp').style.display).toBe('block');
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // #confirmModal remains a true modal that locks document.body.style.overflow = 'hidden' on open and restores '' on close / backdrop click
+            const confirmModal = document.getElementById('confirmModal');
+            expect(confirmModal).not.toBeNull();
+            await api.openModal('confirmModal');
+            expect(confirmModal.style.display).toBe('flex');
+            expect(document.body.style.overflow).toBe('hidden');
+            expect(api.isFormDirty()).toBe(false);
+
+            api.closeModal('confirmModal');
+            expect(confirmModal.style.display).toBe('none');
+            expect(document.body.style.overflow).toBe('');
+            expect(api.isFormDirty()).toBe(false);
+
+            await api.openModal('confirmModal');
+            expect(document.body.style.overflow).toBe('hidden');
+            confirmModal.dispatchEvent({ type: 'click', bubbles: true, target: confirmModal });
+            expect(confirmModal.style.display).toBe('none');
+            expect(document.body.style.overflow).toBe('');
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Ensure subcommand role override ('voice lock' -> '444444444444444444') was not overwritten by parent command cascade
             expect(api.getState().currentCommandRoles['voice']).toBe('333333333333333333');
             expect(api.getState().currentCommandRoles['voice lock']).toBe('444444444444444444');
         });
@@ -1518,6 +1540,1181 @@ describe('Dashboard API', () => {
             expect(html).toContain('@sugoi.js was moved from voice channel <strong>Join to Create</strong> to <strong>dota o ako</strong> by @sugoiBot with @Moderator using <code>/voice move</code>');
             expect(html).toContain('Voice channel created: <strong>dota o ako</strong>');
             expect(html).toContain('@sugoi.js joined voice channel <strong>Join to Create</strong> &lt;script&gt;alert(1)&lt;/script&gt;');
+        });
+    });
+
+    describe('M1–M5 Backend APIs & Overhauled Bento Command Center UI', () => {
+        async function loginForGuilds(guilds, user = { id: 'm_admin', username: 'MasterAdmin' }) {
+            const loginRes = await fetch(`${baseUrl}/api/auth/dev-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user, guilds })
+            });
+            return loginRes.headers.get('set-cookie');
+        }
+
+        it('M1 Voice Hub Creator API: GET /voice returns sorted categories and POST /voice/hubs creates hubs via discordClient and Discord REST fallback', async () => {
+            const voiceGuildId = 'm1_voice_guild_' + Date.now();
+            const cookie = await loginForGuilds([{ id: voiceGuildId, name: 'Voice Studio Server', owner: true }]);
+
+            // Unauthenticated returns 401
+            const unauthRes = await fetch(`${baseUrl}/api/guilds/${voiceGuildId}/voice/hubs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: 'Join to Create' })
+            });
+            expect(unauthRes.status).toBe(401);
+
+            const channelCache = new Map([
+                ['cat_general', { id: 'cat_general', name: 'General Category', type: 4, position: 2 }],
+                ['cat_voice', { id: 'cat_voice', name: 'Voice Rooms', type: 4, position: 0 }],
+                ['txt_chat', { id: 'txt_chat', name: 'general-chat', type: 0, position: 1 }]
+            ]);
+
+            let createdCounter = 100;
+            setDiscordClient({
+                guilds: {
+                    cache: new Map([
+                        [
+                            voiceGuildId,
+                            {
+                                id: voiceGuildId,
+                                name: 'Voice Studio Server',
+                                channels: {
+                                    cache: channelCache,
+                                    async fetch() {
+                                        return channelCache;
+                                    },
+                                    async create(opts) {
+                                        createdCounter += 1;
+                                        const created = {
+                                            id: `created_ch_${createdCounter}`,
+                                            name: opts.name,
+                                            type: opts.type,
+                                            position: channelCache.size,
+                                            parentId: opts.parent || null
+                                        };
+                                        channelCache.set(created.id, created);
+                                        return created;
+                                    }
+                                }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            // 1. GET /voice returns categories sorted ascending by position
+            const getVoiceRes = await fetch(`${baseUrl}/api/guilds/${voiceGuildId}/voice`, {
+                headers: { Cookie: cookie }
+            });
+            expect(getVoiceRes.status).toBe(200);
+            const getVoiceData = await getVoiceRes.json();
+            expect(getVoiceData.categories).toEqual([
+                { id: 'cat_voice', name: 'Voice Rooms', position: 0 },
+                { id: 'cat_general', name: 'General Category', position: 2 }
+            ]);
+
+            // 2. POST /voice/hubs with new category creation via discordClient
+            const createWithNewCatRes = await fetch(`${baseUrl}/api/guilds/${voiceGuildId}/voice/hubs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({
+                    name: 'Squad Lobby',
+                    categoryId: '__new__',
+                    createCategoryName: 'Dynamic Squads'
+                })
+            });
+            expect(createWithNewCatRes.status).toBe(201);
+            const createWithNewCatData = await createWithNewCatRes.json();
+            expect(createWithNewCatData.success).toBe(true);
+            expect(createWithNewCatData.hub).toEqual(expect.objectContaining({
+                hubChannelId: 'created_ch_102',
+                guildId: voiceGuildId,
+                categoryId: 'created_ch_101',
+                name: 'Squad Lobby',
+                categoryName: 'Dynamic Squads',
+                existsInDiscord: true
+            }));
+
+            const persistedHub = db.prepare('SELECT * FROM voice_hubs WHERE hubChannelId = ?').get('created_ch_102');
+            expect(persistedHub).toEqual({
+                hubChannelId: 'created_ch_102',
+                guildId: voiceGuildId,
+                categoryId: 'created_ch_101'
+            });
+
+            // 3. POST /voice/hubs fallback to Discord REST fetch when discordClient is detached
+            setDiscordClient(null);
+            const prevToken = process.env.DISCORD_TOKEN;
+            process.env.DISCORD_TOKEN = '"mock_bot_token_m1"';
+            const realFetch = global.fetch;
+            global.fetch = async (url, options) => {
+                const urlStr = String(url);
+                if (urlStr.startsWith('https://discord.com/api/v10/guilds/')) {
+                    const parsedBody = JSON.parse(options.body);
+                    return new Response(
+                        JSON.stringify({
+                            id: parsedBody.type === 4 ? 'rest_cat_901' : 'rest_hub_902',
+                            name: parsedBody.name,
+                            type: parsedBody.type,
+                            parent_id: parsedBody.parent_id || null
+                        }),
+                        { status: 201, headers: { 'Content-Type': 'application/json' } }
+                    );
+                }
+                return realFetch(url, options);
+            };
+
+            try {
+                const restCreateRes = await realFetch(`${baseUrl}/api/guilds/${voiceGuildId}/voice/hubs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                    body: JSON.stringify({
+                        name: 'REST Join Hub',
+                        createCategoryName: 'REST Voice Category'
+                    })
+                });
+                expect(restCreateRes.status).toBe(201);
+                const restData = await restCreateRes.json();
+                expect(restData.hub).toEqual(expect.objectContaining({
+                    hubChannelId: 'rest_hub_902',
+                    categoryId: 'rest_cat_901',
+                    name: 'REST Join Hub',
+                    categoryName: 'REST Voice Category'
+                }));
+
+                const restRow = db.prepare('SELECT * FROM voice_hubs WHERE hubChannelId = ?').get('rest_hub_902');
+                expect(restRow).toEqual({
+                    hubChannelId: 'rest_hub_902',
+                    guildId: voiceGuildId,
+                    categoryId: 'rest_cat_901'
+                });
+            } finally {
+                global.fetch = realFetch;
+                if (prevToken === undefined) delete process.env.DISCORD_TOKEN;
+                else process.env.DISCORD_TOKEN = prevToken;
+            }
+        });
+
+        it('M2 Moderation Warnings API: GET /warnings supports pagination, search, and username enrichment and DELETE revokes or returns 404', async () => {
+            const warnGuildId = 'm2_warn_guild_' + Date.now();
+            const cookie = await loginForGuilds([{ id: warnGuildId, name: 'Moderation Server', owner: true }]);
+
+            setDiscordClient({
+                users: {
+                    cache: new Map([
+                        ['mod_77', { id: 'mod_77', username: 'ChiefMod' }]
+                    ])
+                },
+                guilds: {
+                    cache: new Map([
+                        [
+                            warnGuildId,
+                            {
+                                id: warnGuildId,
+                                name: 'Moderation Server',
+                                members: {
+                                    cache: new Map([
+                                        ['offender_1', { id: 'offender_1', user: { id: 'offender_1', username: 'SpamBotUser' } }],
+                                        ['offender_2', { id: 'offender_2', user: { id: 'offender_2', username: 'CapsShouter' } }]
+                                    ])
+                                }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            const insertWarn = db.prepare('INSERT INTO warnings (userId, guildId, reason, moderatorId) VALUES (?, ?, ?, ?)');
+            const w1 = insertWarn.run('offender_1', warnGuildId, 'Posting invite links', 'mod_77');
+            insertWarn.run('offender_2', warnGuildId, 'Excessive caps lock', 'mod_77');
+            insertWarn.run('offender_1', warnGuildId, 'Repeated spam in general', 'mod_77');
+
+            // 1. Paginated fetch (limit=2, page=1 & page=2) + username/moderatorName enrichment
+            const page1Res = await fetch(`${baseUrl}/api/guilds/${warnGuildId}/warnings?page=1&limit=2`, {
+                headers: { Cookie: cookie }
+            });
+            expect(page1Res.status).toBe(200);
+            const page1 = await page1Res.json();
+            expect(page1.total).toBe(3);
+            expect(page1.page).toBe(1);
+            expect(page1.limit).toBe(2);
+            expect(page1.totalPages).toBe(2);
+            expect(page1.warnings).toHaveLength(2);
+            expect(page1.warnings[0]).toEqual(expect.objectContaining({
+                userId: 'offender_1',
+                username: 'SpamBotUser',
+                moderatorId: 'mod_77',
+                moderatorName: 'ChiefMod',
+                reason: 'Repeated spam in general'
+            }));
+
+            const page2Res = await fetch(`${baseUrl}/api/guilds/${warnGuildId}/warnings?page=2&limit=2`, {
+                headers: { Cookie: cookie }
+            });
+            const page2 = await page2Res.json();
+            expect(page2.warnings).toHaveLength(1);
+            expect(page2.warnings[0].id).toBe(Number(w1.lastInsertRowid));
+
+            // 2. Search by enriched username and reason
+            const searchRes = await fetch(`${baseUrl}/api/guilds/${warnGuildId}/warnings?search=CapsShouter`, {
+                headers: { Cookie: cookie }
+            });
+            const searchData = await searchRes.json();
+            expect(searchData.total).toBe(1);
+            expect(searchData.warnings[0].reason).toBe('Excessive caps lock');
+
+            // 3. DELETE existing warning -> 200, then second DELETE or missing ID -> 404
+            const delRes = await fetch(`${baseUrl}/api/guilds/${warnGuildId}/warnings/${w1.lastInsertRowid}`, {
+                method: 'DELETE',
+                headers: { Cookie: cookie }
+            });
+            expect(delRes.status).toBe(200);
+            const delData = await delRes.json();
+            expect(delData).toEqual({ success: true, deletedId: Number(w1.lastInsertRowid) });
+
+            const missingDelRes = await fetch(`${baseUrl}/api/guilds/${warnGuildId}/warnings/${w1.lastInsertRowid}`, {
+                method: 'DELETE',
+                headers: { Cookie: cookie }
+            });
+            expect(missingDelRes.status).toBe(404);
+        });
+
+        it('M3 Economy Shop API: CRUD, validation (400 on invalid price/name/stock), and settings export/import round-trip', async () => {
+            const shopGuildId = 'm3_shop_guild_' + Date.now();
+            const restoredGuildId = 'm3_restored_guild_' + Date.now();
+            const cookie = await loginForGuilds([
+                { id: shopGuildId, name: 'Economy Shop Server', owner: true },
+                { id: restoredGuildId, name: 'Restored Shop Server', owner: true }
+            ]);
+
+            setDiscordClient({
+                guilds: {
+                    cache: new Map([
+                        [
+                            shopGuildId,
+                            {
+                                id: shopGuildId,
+                                name: 'Economy Shop Server',
+                                roles: {
+                                    cache: new Map([
+                                        ['900100200300400500', { id: '900100200300400500', name: 'Gold Patron', hexColor: '#f1c40f' }]
+                                    ])
+                                }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            // 1. Validation rejections (empty name, price < 0, stock < -1) -> 400
+            for (const badBody of [
+                { name: '   ', price: 100, stock: -1 },
+                { name: 'Negative Item', price: -5, stock: -1 },
+                { name: 'Bad Stock Item', price: 100, stock: -2 }
+            ]) {
+                const badRes = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/shop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                    body: JSON.stringify(badBody)
+                });
+                expect(badRes.status).toBe(400);
+            }
+
+            // 2. Create two shop items (with quoted roleId sanitization)
+            const createHighRes = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/shop`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({
+                    name: 'Gold Patron Role',
+                    description: 'Shiny gold hoisted role',
+                    price: 1500,
+                    roleId: '"900100200300400500"',
+                    stock: 5
+                })
+            });
+            expect(createHighRes.status).toBe(201);
+            const createdHigh = (await createHighRes.json()).item;
+            expect(createdHigh).toEqual(expect.objectContaining({
+                name: 'Gold Patron Role',
+                price: 1500,
+                roleId: '900100200300400500',
+                roleName: 'Gold Patron',
+                roleColor: '#f1c40f',
+                stock: 5,
+                purchaseCount: 0
+            }));
+
+            const createLowRes = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/shop`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({
+                    name: 'Cookie Badge',
+                    description: 'Collectible snack',
+                    price: 100,
+                    stock: -1
+                })
+            });
+            expect(createLowRes.status).toBe(201);
+            const createdLow = (await createLowRes.json()).item;
+
+            // Seed an inventory purchase to verify purchaseCount enrichment and cascade cleanup on DELETE
+            db.prepare(`
+                INSERT INTO user_inventory (guildId, userId, itemId, itemName, roleId, quantity, purchasedAt)
+                VALUES (?, ?, ?, ?, '', 3, ?)
+            `).run(shopGuildId, 'buyer_1', createdLow.id, 'Cookie Badge', Date.now());
+
+            // 3. GET /shop returns items sorted price ASC, id ASC with purchaseCount
+            const listRes = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/shop`, {
+                headers: { Cookie: cookie }
+            });
+            expect(listRes.status).toBe(200);
+            const listData = await listRes.json();
+            expect(listData.items.map(i => i.name)).toEqual(['Cookie Badge', 'Gold Patron Role']);
+            expect(listData.items[0].purchaseCount).toBe(3);
+
+            // 4. PUT /shop/:itemId updates item & rejects invalid price (400) / missing item (404)
+            const badPut = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/shop/${createdHigh.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({ price: -10 })
+            });
+            expect(badPut.status).toBe(400);
+
+            const missingPut = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/shop/999999`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({ price: 200 })
+            });
+            expect(missingPut.status).toBe(404);
+
+            const putRes = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/shop/${createdHigh.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({ price: 1200, stock: 10 })
+            });
+            expect(putRes.status).toBe(200);
+            const putData = await putRes.json();
+            expect(putData.item.price).toBe(1200);
+            expect(putData.item.stock).toBe(10);
+
+            // 5. DELETE /shop/:itemId removes item and associated user_inventory rows
+            const delRes = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/shop/${createdLow.id}`, {
+                method: 'DELETE',
+                headers: { Cookie: cookie }
+            });
+            expect(delRes.status).toBe(200);
+            const remainingInv = db.prepare('SELECT * FROM user_inventory WHERE guildId = ? AND itemId = ?').all(shopGuildId, createdLow.id);
+            expect(remainingInv).toHaveLength(0);
+
+            // 6. Export & Import round-trip including shop_items, module_embed_colors, and multi-role command_roles
+            await fetch(`${baseUrl}/api/guilds/${shopGuildId}/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({
+                    module_embed_colors: { economy: '#00AAFF', xp: '#FF55AA' },
+                    command_roles: { 'voice lock': ['111111111111111111', '222222222222222222'] }
+                })
+            });
+
+            const exportRes = await fetch(`${baseUrl}/api/guilds/${shopGuildId}/settings/export`, {
+                headers: { Cookie: cookie }
+            });
+            expect(exportRes.status).toBe(200);
+            const bundle = await exportRes.json();
+            expect(bundle.shop_items).toEqual([
+                {
+                    name: 'Gold Patron Role',
+                    description: 'Shiny gold hoisted role',
+                    price: 1200,
+                    roleId: '900100200300400500',
+                    stock: 10
+                }
+            ]);
+
+            const importRes = await fetch(`${baseUrl}/api/guilds/${restoredGuildId}/settings/import`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify(bundle)
+            });
+            expect(importRes.status).toBe(200);
+            const imported = await importRes.json();
+            expect(imported.settings.module_embed_colors).toEqual({ economy: '#00AAFF', xp: '#FF55AA' });
+            expect(imported.settings.command_roles).toEqual({
+                'voice lock': ['111111111111111111', '222222222222222222']
+            });
+            expect(imported.shop_items).toEqual(bundle.shop_items);
+        });
+
+        it('UI static & design-system verification: zero emojis, zero duplicate static DOM IDs, SVG-only gear buttons, #guildSelect removed, :root tokens defined, and zero decorative glassmorphism/gradients', () => {
+            const htmlPath = new URL('../dashboard/public/index.html', import.meta.url);
+            const fullHtml = fs.readFileSync(htmlPath, 'utf8');
+
+            // 1. Zero emoji characters anywhere in index.html
+            const emojiMatches = fullHtml.match(/[\p{Extended_Pictographic}\p{Emoji_Presentation}]/gu) || [];
+            expect(emojiMatches).toHaveLength(0);
+
+            // 1b. Zero duplicate static id="..." attributes in HTML markup
+            const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*?)<script>/i);
+            expect(bodyMatch).not.toBeNull();
+            const staticIds = [...bodyMatch[1].matchAll(/\bid\s*=\s*["']([^"']+)["']/gi)].map(m => m[1]);
+            const seenIds = new Set();
+            const duplicateIds = [];
+            for (const id of staticIds) {
+                if (seenIds.has(id)) duplicateIds.push(id);
+                seenIds.add(id);
+            }
+            expect(duplicateIds).toEqual([]);
+
+            // 2. Server dropdown (#guildSelect) is completely removed from HTML, JS, and parsed DOM
+            expect(fullHtml).not.toContain('guildSelect');
+            const { document } = createDashboardDomHarness({ baseUrl, cookieHeader: '' });
+            expect(document.getElementById('guildSelect')).toBeNull();
+            expect(document.querySelector('select#guildSelect')).toBeNull();
+
+            // 2b. Old module modals are replaced by inline #moduleWorkspace_<mod> panels while #confirmModal remains
+            for (const mod of ['general', 'economy', 'moderation', 'xp', 'gamerole', 'voice']) {
+                expect(document.getElementById(`${mod}Modal`)).toBeNull();
+                expect(document.getElementById(`moduleWorkspace_${mod}`)).not.toBeNull();
+                expect(document.getElementById(`workspace_toggle_${mod}`)).not.toBeNull();
+                expect(document.getElementById(`subnav_dot_${mod}`)).not.toBeNull();
+            }
+            expect(document.getElementById('confirmModal')).not.toBeNull();
+            expect(document.getElementById('auditRoutingCard')).not.toBeNull();
+            expect(document.getElementById('modulesNavToggle')).not.toBeNull();
+            expect(document.getElementById('modulesSubnav')).not.toBeNull();
+
+            // 3. Gear buttons contain an <svg> icon and zero visible "Settings" text
+            const gearButtons = document.querySelectorAll('.module-settings-btn');
+            expect(gearButtons.length).toBeGreaterThanOrEqual(6);
+            for (const btn of gearButtons) {
+                expect(btn.querySelector('svg')).not.toBeNull();
+                expect(btn.textContent.trim()).toBe('');
+                expect(btn.innerHTML).not.toContain('Settings');
+            }
+
+            // 4. <style> :root defines organized tokens for colors, typography, spacing, border-radius, shadows, and component dimensions
+            const styleMatch = fullHtml.match(/<style>([\s\S]*?)<\/style>/i);
+            expect(styleMatch).not.toBeNull();
+            const styleCss = styleMatch[1];
+
+            const rootMatch = styleCss.match(/:root\s*\{([\s\S]*?)\}/);
+            expect(rootMatch).not.toBeNull();
+            const rootTokens = rootMatch[1];
+
+            const requiredTokens = [
+                // Colors (neutral charcoal surfaces, borders, text, single primary accent, semantic status)
+                '--color-bg-canvas',
+                '--color-bg-surface',
+                '--color-bg-subtle',
+                '--color-bg-elevated',
+                '--color-bg-hover',
+                '--color-border-subtle',
+                '--color-border',
+                '--color-border-strong',
+                '--color-text-primary',
+                '--color-text-secondary',
+                '--color-text-muted',
+                '--color-accent',
+                '--color-accent-hover',
+                '--color-accent-subtle',
+                '--color-success',
+                '--color-warning',
+                '--color-danger',
+                // Typography
+                '--font-sans',
+                '--font-mono',
+                '--text-xs',
+                '--text-sm',
+                '--text-base',
+                '--text-md',
+                '--text-lg',
+                '--text-xl',
+                '--weight-regular',
+                '--weight-medium',
+                '--weight-semibold',
+                // Spacing
+                '--space-1',
+                '--space-2',
+                '--space-3',
+                '--space-4',
+                '--space-5',
+                '--space-6',
+                '--space-8',
+                // Border-radius (4px–10px)
+                '--radius-xs',
+                '--radius-sm',
+                '--radius-md',
+                '--radius-lg',
+                // Shadows
+                '--shadow-sm',
+                '--shadow-md',
+                '--shadow-lg',
+                // Component dimensions
+                '--sidebar-width',
+                '--header-height',
+                '--control-height',
+                '--control-height-sm'
+            ];
+            for (const token of requiredTokens) {
+                expect(rootTokens).toContain(`${token}:`);
+            }
+            expect(rootTokens).toMatch(/--color-accent:\s*#5865f2/i);
+            expect(rootTokens).toMatch(/--radius-xs:\s*4px/);
+            expect(rootTokens).toMatch(/--radius-lg:\s*10px/);
+
+            // 5. Clean flat styling: no radial-gradient, linear-gradient, backdrop-filter glassmorphism, or ambient glows
+            expect(styleCss).not.toContain('radial-gradient(');
+            expect(styleCss).not.toContain('linear-gradient(');
+            expect(styleCss).not.toContain('backdrop-filter:');
+            expect(styleCss).not.toContain('-webkit-backdrop-filter:');
+            expect(styleCss).not.toContain('--accent-glow');
+
+            // 6. Accessible focus/disabled states and responsive breakpoints
+            expect(styleCss).toContain(':focus-visible');
+            expect(styleCss).toContain('button:disabled');
+            expect(styleCss).toContain('@media (max-width: 1280px)');
+            expect(styleCss).toContain('@media (max-width: 1024px)');
+            expect(styleCss).toContain('@media (max-width: 640px)');
+        });
+
+        it('UI Modernization Navigation: clicking .server-item in #serversGrid switches active guild cleanly without #guildSelect or false-positive #floatingSaveBar', async () => {
+            const alphaGuildId = 'nav_alpha_' + Date.now();
+            const betaGuildId = 'nav_beta_' + Date.now();
+
+            setDiscordClient({
+                guilds: {
+                    cache: new Map([
+                        [
+                            alphaGuildId,
+                            {
+                                id: alphaGuildId,
+                                name: 'Alpha Workspace',
+                                icon: null,
+                                channels: { cache: new Map(), async fetch() { return this.cache; } },
+                                roles: { cache: new Map(), async fetch() { return this.cache; } }
+                            }
+                        ],
+                        [
+                            betaGuildId,
+                            {
+                                id: betaGuildId,
+                                name: 'Beta Workspace',
+                                icon: null,
+                                channels: { cache: new Map(), async fetch() { return this.cache; } },
+                                roles: { cache: new Map(), async fetch() { return this.cache; } }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            const cookieHeader = await loginForGuilds([
+                { id: alphaGuildId, name: 'Alpha Workspace', owner: true },
+                { id: betaGuildId, name: 'Beta Workspace', owner: true }
+            ]);
+
+            await fetch(`${baseUrl}/api/guilds/${alphaGuildId}/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+                body: JSON.stringify({ xp_min: 11, xp_max: 22, module_economy_enabled: true })
+            });
+            await fetch(`${baseUrl}/api/guilds/${betaGuildId}/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookieHeader },
+                body: JSON.stringify({ xp_min: 18, xp_max: 36, module_economy_enabled: false })
+            });
+
+            const { document, api } = createDashboardDomHarness({ baseUrl, cookieHeader });
+            const saveBar = document.getElementById('floatingSaveBar');
+
+            expect(document.getElementById('guildSelect')).toBeNull();
+
+            // Authenticate and populate #serversGrid via checkAuth()
+            await api.checkAuth();
+            await new Promise(r => setTimeout(r, 150));
+
+            expect(document.getElementById('authenticatedShell').style.display).toBe('grid');
+            expect(document.getElementById('publicTopbar').style.display).toBe('none');
+            expect(document.getElementById('landingLoginCard').style.display).toBe('none');
+
+            const serverItems = document.querySelectorAll('#serversGrid .server-item');
+            expect(serverItems).toHaveLength(2);
+            expect(serverItems[0].getAttribute('data-guild-id')).toBe(alphaGuildId);
+            expect(serverItems[1].getAttribute('data-guild-id')).toBe(betaGuildId);
+
+            // Alpha Workspace auto-selected on initial load
+            expect(api.getState().currentGuildId).toBe(alphaGuildId);
+            expect(serverItems[0].classList.contains('selected')).toBe(true);
+            expect(serverItems[1].classList.contains('selected')).toBe(false);
+            expect(document.getElementById('selectedServerTitle').textContent).toBe('Alpha Workspace');
+            expect(document.getElementById('selectedServerBadge').textContent).toBe(`ID: ${alphaGuildId}`);
+            expect(document.getElementById('xp_min').value).toBe('11');
+            expect(document.getElementById('module_economy_enabled').checked).toBe(true);
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Click second .server-item in #serversGrid to switch to Beta Workspace
+            serverItems[1].click();
+            await new Promise(r => setTimeout(r, 150));
+
+            expect(api.getState().currentGuildId).toBe(betaGuildId);
+            expect(serverItems[0].classList.contains('selected')).toBe(false);
+            expect(serverItems[1].classList.contains('selected')).toBe(true);
+            expect(document.getElementById('selectedServerTitle').textContent).toBe('Beta Workspace');
+            expect(document.getElementById('selectedServerBadge').textContent).toBe(`ID: ${betaGuildId}`);
+            expect(document.getElementById('xp_min').value).toBe('18');
+            expect(document.getElementById('module_economy_enabled').checked).toBe(false);
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Expandable Modules dropdown starts collapsed and expands/collapses cleanly without dirtying #settingsForm
+            const navButtons = document.querySelectorAll('#workspaceNav .workspace-nav-btn');
+            expect(navButtons.length).toBe(3);
+
+            const overviewBtn = document.querySelector('#workspaceNav [data-workspace-view="all"]');
+            const modulesNavToggle = document.getElementById('modulesNavToggle');
+            const modulesSubnav = document.getElementById('modulesSubnav');
+            const auditBtn = document.querySelector('#workspaceNav [data-workspace-view="audit"]');
+
+            expect(overviewBtn.classList.contains('active')).toBe(true);
+            expect(modulesSubnav.style.display).toBe('none');
+            expect(modulesNavToggle.getAttribute('aria-expanded')).toBe('false');
+            expect(api.getModulesNavExpanded()).toBe(false);
+
+            // Click Modules toggle -> expands subnav revealing all 6 modules without dirtying form
+            modulesNavToggle.click();
+            expect(modulesNavToggle.getAttribute('aria-expanded')).toBe('true');
+            expect(modulesNavToggle.classList.contains('expanded')).toBe(true);
+            expect(modulesSubnav.style.display).toBe('flex');
+            expect(api.getModulesNavExpanded()).toBe(true);
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            const subnavBtns = document.querySelectorAll('#modulesSubnav .workspace-subnav-btn');
+            expect(subnavBtns).toHaveLength(6);
+            expect(subnavBtns.map(b => b.getAttribute('data-module-nav'))).toEqual([
+                'general',
+                'economy',
+                'moderation',
+                'xp',
+                'gamerole',
+                'voice'
+            ]);
+            expect(subnavBtns.map(b => b.querySelector('span').textContent.trim())).toEqual([
+                'General',
+                'Economy',
+                'Moderation',
+                'XP &amp; Leveling',
+                'GameRole',
+                'Temporary Voice'
+            ]);
+
+            // Click Modules toggle again -> collapses subnav without dirtying form
+            modulesNavToggle.click();
+            expect(modulesNavToggle.getAttribute('aria-expanded')).toBe('false');
+            expect(modulesNavToggle.classList.contains('expanded')).toBe(false);
+            expect(modulesSubnav.style.display).toBe('none');
+            expect(api.getModulesNavExpanded()).toBe(false);
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Clicking Overview, each module subnav item, and Audit Logs switches views cleanly without dirtying form
+            for (const btn of [overviewBtn, ...subnavBtns, auditBtn]) {
+                btn.click();
+                await new Promise(r => setTimeout(r, 40));
+                expect(btn.classList.contains('active')).toBe(true);
+                expect(api.isFormDirty()).toBe(false);
+                expect(saveBar.classList.contains('visible')).toBe(false);
+            }
+        });
+
+        it('Audit Log Workspace Isolation: Overview hides #auditRoutingCard & #auditLogsCard, while Audit Logs view displays both and persists settings via #settingsForm', async () => {
+            const auditIsoGuildId = 'audit_iso_guild_' + Date.now();
+            const channelCache = new Map([
+                ['101010101010101010', { id: '101010101010101010', name: 'staff-audit', type: 0, position: 0 }],
+                ['202020202020202020', { id: '202020202020202020', name: 'security-logs', type: 0, position: 1 }]
+            ]);
+
+            setDiscordClient({
+                guilds: {
+                    cache: new Map([
+                        [
+                            auditIsoGuildId,
+                            {
+                                id: auditIsoGuildId,
+                                name: 'Audit Isolation Server',
+                                channels: { cache: channelCache, async fetch() { return channelCache; } },
+                                roles: { cache: new Map(), async fetch() { return this.cache; } }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            const cookieHeader = await loginForGuilds([{ id: auditIsoGuildId, name: 'Audit Isolation Server', owner: true }]);
+            const { document, api } = createDashboardDomHarness({ baseUrl, cookieHeader });
+            const saveBar = document.getElementById('floatingSaveBar');
+
+            await api.loadAllCommands();
+            await api.loadGuildSettings(auditIsoGuildId, 'Audit Isolation Server');
+            await new Promise(r => setTimeout(r, 130));
+
+            const settingsCard = document.getElementById('settingsCard');
+            const statsGrid = document.getElementById('statsGrid');
+            const auditRoutingCard = document.getElementById('auditRoutingCard');
+            const auditLogsCard = document.getElementById('auditLogsCard');
+            const bentoAuditDock = document.getElementById('bentoAuditDock');
+
+            // 1. On Overview ('all'), #settingsCard & #statsGrid are visible while #auditRoutingCard & #auditLogsCard are hidden
+            expect(api.getState().currentWorkspaceView).toBe('all');
+            expect(statsGrid.style.display).toBe('flex');
+            expect(settingsCard.style.display).toBe('block');
+            expect(auditRoutingCard.style.display).toBe('none');
+            expect(auditLogsCard.style.display).toBe('none');
+            expect(bentoAuditDock.style.display).toBe('none');
+
+            // Verify Audit Log inputs were moved out of #settingsCard into #auditRoutingCard and remain bound to #settingsForm
+            expect(settingsCard.querySelector('#log_channel_id')).toBeNull();
+            expect(auditRoutingCard.querySelector('#log_channel_id')).not.toBeNull();
+            expect(document.getElementById('log_channel_id').getAttribute('form')).toBe('settingsForm');
+            expect(auditRoutingCard.querySelector('#embed_color_hex_core')).not.toBeNull();
+
+            const logEventKeys = [
+                'log_events_member_join',
+                'log_events_member_leave',
+                'log_events_member_update',
+                'log_events_message_delete',
+                'log_events_channels',
+                'log_events_roles',
+                'log_events_moderation',
+                'log_events_voice',
+                'log_events_commands'
+            ];
+            for (const key of logEventKeys) {
+                expect(settingsCard.querySelector(`#${key}`)).toBeNull();
+                const checkbox = auditRoutingCard.querySelector(`#${key}`);
+                expect(checkbox).not.toBeNull();
+                expect(checkbox.getAttribute('form')).toBe('settingsForm');
+            }
+
+            // 2. Clicking Audit Logs ([data-workspace-view="audit"]) displays BOTH #auditRoutingCard and #auditLogsCard and hides #settingsCard cleanly
+            const auditNavBtn = document.querySelector('#workspaceNav [data-workspace-view="audit"]');
+            auditNavBtn.click();
+            await new Promise(r => setTimeout(r, 50));
+
+            expect(api.getState().currentWorkspaceView).toBe('audit');
+            expect(auditNavBtn.classList.contains('active')).toBe(true);
+            expect(settingsCard.style.display).toBe('none');
+            expect(statsGrid.style.display).toBe('none');
+            expect(auditRoutingCard.style.display).toBe('block');
+            expect(auditLogsCard.style.display).toBe('block');
+            expect(bentoAuditDock.style.display).toBe('block');
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // 3. Editing log_channel_id, log_events_* checkboxes, and core embed color inside Audit Logs workspace marks #settingsForm dirty and saves cleanly
+            const logSearch = document.getElementById('log_channel_search');
+            const logDropdown = document.getElementById('log_channel_dropdown');
+            logSearch.focus();
+            const secChannelOpt = logDropdown.children.find(el => el.innerHTML.includes('#security-logs'));
+            expect(secChannelOpt).toBeDefined();
+            secChannelOpt.click();
+
+            const voiceEventToggle = document.getElementById('log_events_voice');
+            voiceEventToggle.checked = true;
+            voiceEventToggle.dispatchEvent({ type: 'change', bubbles: true, target: voiceEventToggle });
+
+            const joinEventToggle = document.getElementById('log_events_member_join');
+            joinEventToggle.checked = false;
+            joinEventToggle.dispatchEvent({ type: 'change', bubbles: true, target: joinEventToggle });
+
+            api.setModuleEmbedColor('core', '#3366FF');
+
+            expect(api.isFormDirty()).toBe(true);
+            expect(saveBar.classList.contains('visible')).toBe(true);
+
+            document.getElementById('settingsForm').requestSubmit();
+            await new Promise(r => setTimeout(r, 80));
+
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            const savedRes = await fetch(`${baseUrl}/api/guilds/${auditIsoGuildId}/settings`, {
+                headers: { Cookie: cookieHeader }
+            });
+            const savedJson = await savedRes.json();
+            expect(savedJson.settings.log_channel_id).toBe('202020202020202020');
+            expect(savedJson.settings.log_events_voice).toBe(true);
+            expect(savedJson.settings.log_events_member_join).toBe(false);
+            expect(savedJson.settings.module_embed_colors.core).toBe('#3366FF');
+        });
+
+        it('Per-Module Workspaces & Two-Way Enable/Disable Sync: module panels pair with studios and sync #workspace_toggle_<mod>, #module_<mod>_enabled, #subnav_dot_<mod>, and #floatingSaveBar', async () => {
+            const modSyncGuildId = 'mod_sync_guild_' + Date.now();
+
+            setDiscordClient({
+                guilds: {
+                    cache: new Map([
+                        [
+                            modSyncGuildId,
+                            {
+                                id: modSyncGuildId,
+                                name: 'Module Workspace Server',
+                                channels: {
+                                    cache: new Map([
+                                        ['303030303030303030', { id: '303030303030303030', name: 'xp-feed', type: 0, position: 0 }]
+                                    ]),
+                                    async fetch() { return this.cache; }
+                                },
+                                roles: {
+                                    cache: new Map([
+                                        ['404040404040404040', { id: '404040404040404040', name: 'Staff', position: 3, managed: false, hexColor: '#5865f2' }]
+                                    ]),
+                                    async fetch() { return this.cache; }
+                                }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            const cookieHeader = await loginForGuilds([{ id: modSyncGuildId, name: 'Module Workspace Server', owner: true }]);
+            const { document, api } = createDashboardDomHarness({ baseUrl, cookieHeader });
+            const saveBar = document.getElementById('floatingSaveBar');
+
+            await api.loadAllCommands();
+            await api.loadGuildSettings(modSyncGuildId, 'Module Workspace Server');
+            await new Promise(r => setTimeout(r, 130));
+
+            const moduleMatrix = [
+                {
+                    mod: 'general',
+                    expectedInputs: ['#embed_color_hex_general'],
+                    studioVisible: { shop: false, warnings: false, voice: false }
+                },
+                {
+                    mod: 'economy',
+                    expectedInputs: ['#embed_color_hex_economy'],
+                    studioVisible: { shop: true, warnings: false, voice: false }
+                },
+                {
+                    mod: 'moderation',
+                    expectedInputs: ['#embed_color_hex_moderation'],
+                    studioVisible: { shop: false, warnings: true, voice: false }
+                },
+                {
+                    mod: 'xp',
+                    expectedInputs: ['#xp_min', '#xp_max', '#xp_voice_per_minute', '#xp_channel_id', '#role_rewards_enabled', '#roleRewardsList', '#embed_color_hex_xp'],
+                    studioVisible: { shop: false, warnings: false, voice: false }
+                },
+                {
+                    mod: 'gamerole',
+                    expectedInputs: ['#gamerole_prefix', '#gamerole_position', '#gamerole_color', '#embed_color_hex_gamerole'],
+                    studioVisible: { shop: false, warnings: false, voice: false }
+                },
+                {
+                    mod: 'voice',
+                    expectedInputs: ['#voice_naming_scheme', '#voice_default_limit', '#voiceHubsCount', '#voiceHubsList', '#embed_color_hex_voice'],
+                    studioVisible: { shop: false, warnings: false, voice: true }
+                }
+            ];
+
+            // 1. Clicking each module item under #modulesSubnav displays ONLY that module's workspace & paired studio without dirtying #settingsForm
+            for (const entry of moduleMatrix) {
+                const subnavBtn = document.querySelector(`#modulesSubnav .workspace-subnav-btn[data-module-nav="${entry.mod}"]`);
+                expect(subnavBtn).not.toBeNull();
+                subnavBtn.click();
+                await new Promise(r => setTimeout(r, 50));
+
+                expect(api.getState().currentWorkspaceView).toBe(`module:${entry.mod}`);
+                expect(subnavBtn.classList.contains('active')).toBe(true);
+                expect(document.getElementById('settingsCard').style.display).toBe('none');
+                expect(document.getElementById('auditRoutingCard').style.display).toBe('none');
+                expect(document.getElementById('auditLogsCard').style.display).toBe('none');
+
+                for (const other of moduleMatrix) {
+                    const panel = document.getElementById(`moduleWorkspace_${other.mod}`);
+                    expect(panel.style.display).toBe(other.mod === entry.mod ? 'block' : 'none');
+                }
+
+                const activePanel = document.getElementById(`moduleWorkspace_${entry.mod}`);
+                for (const selector of entry.expectedInputs) {
+                    expect(activePanel.querySelector(selector)).not.toBeNull();
+                }
+                expect(activePanel.querySelector(`.module-cmd-roles[data-module="${entry.mod}"]`)).not.toBeNull();
+
+                expect(document.getElementById('shopStudioCard').style.display).toBe(entry.studioVisible.shop ? 'block' : 'none');
+                expect(document.getElementById('warningsConsoleCard').style.display).toBe(entry.studioVisible.warnings ? 'block' : 'none');
+                expect(document.getElementById('voiceStudioCard').style.display).toBe(entry.studioVisible.voice ? 'block' : 'none');
+
+                expect(api.isFormDirty()).toBe(false);
+                expect(saveBar.classList.contains('visible')).toBe(false);
+            }
+
+            // 2. Two-way sync: toggling #workspace_toggle_<mod> syncs #module_<mod>_enabled, #subnav_dot_<mod>, #activeModulesCount, and #floatingSaveBar
+            await api.setWorkspaceView('module:xp');
+            const xpWorkspaceToggle = document.getElementById('workspace_toggle_xp');
+            const xpPrimaryCheckbox = document.getElementById('module_xp_enabled');
+            const xpSubnavDot = document.getElementById('subnav_dot_xp');
+            const xpToggleLabel = document.getElementById('workspace_toggle_label_xp');
+
+            expect(api.captureFormState()).not.toHaveProperty('workspace_toggle_xp');
+            expect(xpWorkspaceToggle.checked).toBe(true);
+            expect(xpPrimaryCheckbox.checked).toBe(true);
+            expect(xpSubnavDot.getAttribute('data-enabled')).toBe('true');
+            expect(xpSubnavDot.classList.contains('enabled')).toBe(true);
+            expect(document.getElementById('activeModulesCount').textContent).toBe('6 / 6');
+
+            // Toggle off inside module workspace -> marks dirty, updates primary checkbox + status dot + KPI
+            xpWorkspaceToggle.checked = false;
+            xpWorkspaceToggle.dispatchEvent({ type: 'change', bubbles: true, target: xpWorkspaceToggle });
+
+            expect(xpPrimaryCheckbox.checked).toBe(false);
+            expect(xpSubnavDot.getAttribute('data-enabled')).toBe('false');
+            expect(xpSubnavDot.classList.contains('disabled')).toBe(true);
+            expect(xpToggleLabel.textContent).toBe('Disabled');
+            expect(document.getElementById('activeModulesCount').textContent).toBe('5 / 6');
+            expect(api.isFormDirty()).toBe(true);
+            expect(saveBar.classList.contains('visible')).toBe(true);
+
+            // Reverting #workspace_toggle_xp clears dirty state
+            xpWorkspaceToggle.checked = true;
+            xpWorkspaceToggle.dispatchEvent({ type: 'change', bubbles: true, target: xpWorkspaceToggle });
+            expect(xpPrimaryCheckbox.checked).toBe(true);
+            expect(xpSubnavDot.getAttribute('data-enabled')).toBe('true');
+            expect(document.getElementById('activeModulesCount').textContent).toBe('6 / 6');
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Reset button restores both #module_xp_enabled and #workspace_toggle_xp + #subnav_dot_xp
+            xpWorkspaceToggle.checked = false;
+            xpWorkspaceToggle.dispatchEvent({ type: 'change', bubbles: true, target: xpWorkspaceToggle });
+            expect(saveBar.classList.contains('visible')).toBe(true);
+
+            document.getElementById('resetBtn').click();
+            expect(xpPrimaryCheckbox.checked).toBe(true);
+            expect(xpWorkspaceToggle.checked).toBe(true);
+            expect(xpSubnavDot.getAttribute('data-enabled')).toBe('true');
+            expect(xpToggleLabel.textContent).toBe('Enabled');
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Toggling primary checkbox on Overview also syncs #workspace_toggle_<mod> and #subnav_dot_<mod>, and saving persists cleanly
+            await api.setWorkspaceView('all');
+            const econPrimary = document.getElementById('module_economy_enabled');
+            const econWorkspaceToggle = document.getElementById('workspace_toggle_economy');
+            const econSubnavDot = document.getElementById('subnav_dot_economy');
+
+            econPrimary.checked = false;
+            econPrimary.dispatchEvent({ type: 'change', bubbles: true, target: econPrimary });
+            expect(econWorkspaceToggle.checked).toBe(false);
+            expect(econSubnavDot.getAttribute('data-enabled')).toBe('false');
+            expect(api.isFormDirty()).toBe(true);
+            expect(saveBar.classList.contains('visible')).toBe(true);
+
+            document.getElementById('settingsForm').requestSubmit();
+            await new Promise(r => setTimeout(r, 80));
+
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+            expect(econWorkspaceToggle.checked).toBe(false);
+            expect(econSubnavDot.getAttribute('data-enabled')).toBe('false');
+
+            const verifyRes = await fetch(`${baseUrl}/api/guilds/${modSyncGuildId}/settings`, {
+                headers: { Cookie: cookieHeader }
+            });
+            const verifyJson = await verifyRes.json();
+            expect(verifyJson.settings.module_economy_enabled).toBe(false);
+        });
+
+        it('M4, M5 & Studio Dirty-State Isolation: multi-role combobox chips/cascade, custom embed color dirty state, and clean auxiliary Studio inputs', async () => {
+            const uiGuildId = 'ui_overhaul_guild_' + Date.now();
+            const channelCache = new Map([
+                ['cat_1', { id: 'cat_1', name: 'Voice Hub Category', type: 4, position: 0 }],
+                ['ch_log', { id: 'ch_log', name: 'audit-log', type: 0, position: 1 }]
+            ]);
+
+            setDiscordClient({
+                guilds: {
+                    cache: new Map([
+                        [
+                            uiGuildId,
+                            {
+                                id: uiGuildId,
+                                name: 'Bento UI Server',
+                                channels: {
+                                    cache: channelCache,
+                                    async fetch() {
+                                        return channelCache;
+                                    },
+                                    async create(opts) {
+                                        const created = {
+                                            id: 'ui_created_' + Date.now(),
+                                            name: opts.name,
+                                            type: opts.type,
+                                            position: 2,
+                                            parentId: opts.parent || null
+                                        };
+                                        channelCache.set(created.id, created);
+                                        return created;
+                                    }
+                                },
+                                roles: {
+                                    cache: new Map([
+                                        ['333333333333333333', { id: '333333333333333333', name: 'Moderator', position: 6, managed: false, hexColor: '#5865f2' }],
+                                        ['444444444444444444', { id: '444444444444444444', name: 'VIP', position: 5, managed: false, hexColor: '#23a55a' }],
+                                        ['555555555555555555', { id: '555555555555555555', name: 'DJ', position: 4, managed: false, hexColor: '#f1c40f' }]
+                                    ]),
+                                    async fetch() {
+                                        return this.cache;
+                                    }
+                                }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            const cookieHeader = await loginForGuilds([{ id: uiGuildId, name: 'Bento UI Server', owner: true }]);
+            const harness = createDashboardDomHarness({ baseUrl, cookieHeader });
+            const { document, api } = harness;
+            const saveBar = document.getElementById('floatingSaveBar');
+
+            await api.loadAllCommands();
+            await api.loadGuildSettings(uiGuildId, 'Bento UI Server');
+            await new Promise(r => setTimeout(r, 130));
+
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // --- Part A: Auxiliary inputs in Voice Hub Studio, Economy Shop composer, Warnings search, and Workspace switcher NEVER mark #settingsForm dirty ---
+            const auxiliaryEdits = [
+                ['voiceHubCreateName', 'Custom Squad Hub'],
+                ['voiceHubCategorySelect', 'cat_1'],
+                ['voiceHubNewCategoryName', 'Temp Voice Rooms'],
+                ['shopItemName', 'Diamond Sword'],
+                ['shopItemPrice', '750'],
+                ['shopItemStock', '15'],
+                ['shopItemRoleSelect', '444444444444444444'],
+                ['shopItemDesc', 'Legendary weapon role'],
+                ['warningsSearchInput', 'spam']
+            ];
+
+            for (const [inputId, nextVal] of auxiliaryEdits) {
+                const el = document.getElementById(inputId);
+                expect(el).not.toBeNull();
+                el.value = nextVal;
+                el.dispatchEvent({ type: 'input', bubbles: true, target: el });
+                el.dispatchEvent({ type: 'change', bubbles: true, target: el });
+                expect(api.isFormDirty()).toBe(false);
+                expect(saveBar.classList.contains('visible')).toBe(false);
+            }
+
+            // Switching workspace views never marks form dirty
+            await api.setWorkspaceView('shop');
+            expect(document.getElementById('moduleWorkspace_economy').style.display).toBe('block');
+            expect(document.getElementById('shopStudioCard').style.display).toBe('block');
+            await api.setWorkspaceView('all');
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Executing studio actions (create hub, create shop item) keeps #floatingSaveBar hidden
+            const hubResult = await api.createVoiceHub();
+            expect(hubResult.success).toBe(true);
+            const shopResult = await api.saveShopItem();
+            expect(shopResult.success).toBe(true);
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // --- Part B: Custom module embed color editing marks form dirty, and reverting/saving clears dirty state ---
+            const econHexInput = document.getElementById('embed_color_hex_economy');
+            expect(econHexInput).not.toBeNull();
+            econHexInput.value = '#12AB34';
+            econHexInput.dispatchEvent({ type: 'input', bubbles: true, target: econHexInput });
+
+            expect(api.getModuleEmbedColors().economy).toBe('#12AB34');
+            expect(api.isFormDirty()).toBe(true);
+            expect(saveBar.classList.contains('visible')).toBe(true);
+
+            // Reverting via resetModuleEmbedColor clears dirty state
+            api.resetModuleEmbedColor('economy');
+            expect(api.getModuleEmbedColors().economy).toBeUndefined();
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Setting custom color again and saving persists and clears dirty state
+            api.setModuleEmbedColor('xp', '#00DDAA');
+            expect(api.isFormDirty()).toBe(true);
+            expect(saveBar.classList.contains('visible')).toBe(true);
+
+            document.getElementById('settingsForm').requestSubmit();
+            await new Promise(r => setTimeout(r, 80));
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // --- Part C: Multi-role command combobox toggling multiple roles, cascading to subcommands, removing role chip, and saving arrays ---
+            await api.openModal('voiceModal');
+            const voiceSearch = document.getElementById('cmd_role_search_voice');
+            const voiceDrop = document.getElementById('cmd_role_drop_voice');
+            const voiceChips = document.getElementById('cmd_role_chips_voice');
+            expect(voiceSearch).not.toBeNull();
+
+            // Select first role (@Moderator) on parent /voice
+            voiceSearch.focus();
+            const modOption = voiceDrop.children.find(el => el.innerHTML.includes('@Moderator'));
+            expect(modOption).toBeDefined();
+            modOption.click();
+
+            // Select second role (@VIP) on parent /voice -> becomes multi-role array & cascades to subcommands
+            voiceSearch.focus();
+            const vipOption = voiceDrop.children.find(el => el.innerHTML.includes('@VIP'));
+            expect(vipOption).toBeDefined();
+            vipOption.click();
+
+            expect(api.getCommandRoles()['voice']).toEqual(['333333333333333333', '444444444444444444']);
+            expect(api.getCommandRoles()['voice lock']).toEqual(['333333333333333333', '444444444444444444']);
+            expect(voiceChips.querySelectorAll('[data-remove-role]').length).toBe(2);
+            expect(api.isFormDirty()).toBe(true);
+            expect(saveBar.classList.contains('visible')).toBe(true);
+
+            // Add third role (@DJ) to 'voice lock' subcommand, then remove @Moderator chip from 'voice lock' -> subcommand holds ['444444444444444444', '555555555555555555'] while parent retains ['333333333333333333', '444444444444444444']
+            const lockSearch = document.getElementById('cmd_role_search_voice_lock');
+            const lockDrop = document.getElementById('cmd_role_drop_voice_lock');
+            const lockChips = document.getElementById('cmd_role_chips_voice_lock');
+            lockSearch.focus();
+            const djSubOption = lockDrop.children.find(el => el.innerHTML.includes('@DJ'));
+            expect(djSubOption).toBeDefined();
+            djSubOption.click();
+            expect(api.getCommandRoles()['voice lock']).toEqual([
+                '333333333333333333',
+                '444444444444444444',
+                '555555555555555555'
+            ]);
+
+            const removeModChipBtn = lockChips.querySelector('[data-remove-role="333333333333333333"]');
+            expect(removeModChipBtn).not.toBeNull();
+            removeModChipBtn.click();
+
+            expect(api.getCommandRoles()['voice']).toEqual(['333333333333333333', '444444444444444444']);
+            expect(api.getCommandRoles()['voice lock']).toEqual(['444444444444444444', '555555555555555555']);
+
+            // Save settings -> persists command_roles arrays & module_embed_colors to backend and clears dirty state
+            api.closeModal('voiceModal');
+            document.getElementById('settingsForm').requestSubmit();
+            await new Promise(r => setTimeout(r, 80));
+
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            const verifyRes = await fetch(`${baseUrl}/api/guilds/${uiGuildId}/settings`, {
+                headers: { Cookie: cookieHeader }
+            });
+            const verifyJson = await verifyRes.json();
+            expect(verifyJson.settings.module_embed_colors).toEqual({ xp: '#00DDAA' });
+            expect(verifyJson.settings.command_roles.voice).toEqual(['333333333333333333', '444444444444444444']);
+            expect(verifyJson.settings.command_roles['voice lock']).toEqual(['444444444444444444', '555555555555555555']);
         });
     });
 });

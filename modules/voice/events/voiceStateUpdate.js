@@ -97,7 +97,7 @@ export default {
 
                 // Send control interface directly in the new voice channel's chat box!
                 if (typeof newChannel.send === 'function') {
-                    const embed = createVoiceInterfaceEmbed();
+                    const embed = createVoiceInterfaceEmbed(guild.id);
                     const components = createVoiceInterfaceComponents();
                     await newChannel.send({ embeds: [embed], components }).catch(() => {});
                 }

@@ -53,6 +53,13 @@ export default {
             ? interaction.user.displayAvatarURL({ size: 128 })
             : undefined;
 
+        let embedColor = 0x57F287;
+        try {
+            if (typeof SettingsManager.getEmbedColor === 'function') {
+                embedColor = SettingsManager.getEmbedColor(interaction.guild.id, 'moderation', 0x57F287);
+            }
+        } catch {}
+
         const testEmbed = new EmbedBuilder()
             .setAuthor({
                 name: interaction.user.tag,
@@ -60,7 +67,7 @@ export default {
             })
             .setTitle('✅ Logging System Verification')
             .setDescription(`This is a test audit log dispatched by **${interaction.user.tag}** using \`/testlog\`.\n\nYour logging configuration is working properly!`)
-            .setColor(0x57F287)
+            .setColor(embedColor)
             .addFields(
                 { name: 'Target Channel', value: `<#${channel.id}> (\`${channel.id}\`)`, inline: true },
                 { name: 'Server', value: `${interaction.guild.name} (\`${interaction.guild.id}\`)`, inline: true },

@@ -7,7 +7,7 @@ import {
     EmbedBuilder
 } from 'discord.js';
 import db from '../../../lib/database.js';
-import { getVoiceRecord, saveUserVoiceSettings } from '../lib/voiceHelper.js';
+import { getVoiceRecord, saveUserVoiceSettings, resolveVoiceEmbedColor } from '../lib/voiceHelper.js';
 
 export default {
     name: Events.InteractionCreate,
@@ -114,7 +114,7 @@ export default {
                     { name: 'Participants', value: `${voiceChannel.members.size} / ${voiceChannel.userLimit || '∞'}`, inline: true },
                     { name: 'Bitrate', value: `${voiceChannel.bitrate / 1000} kbps`, inline: true }
                 )
-                .setColor(0x5865F2)
+                .setColor(resolveVoiceEmbedColor(interaction.guild.id, 0x5865F2))
                 .setFooter({ text: 'Temporary Voice Room Details' });
 
             return interaction.reply({ embeds: [embed], ephemeral: true });

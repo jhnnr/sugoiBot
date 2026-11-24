@@ -2,6 +2,25 @@ import { Events, Collection, PermissionFlagsBits } from 'discord.js';
 import { SettingsManager } from '../../../lib/settings.js';
 import { loggingService } from '../../../lib/bot/loggingService.js';
 
+function normalizeCommandRoleIds(rawValue) {
+    if (typeof SettingsManager.normalizeCommandRoles === 'function') {
+        return SettingsManager.normalizeCommandRoles(rawValue);
+    }
+    if (rawValue === null || rawValue === undefined) return [];
+    const list = Array.isArray(rawValue) ? rawValue : (typeof rawValue === 'string' ? [rawValue] : []);
+    const seen = new Set();
+    const normalized = [];
+    for (const item of list) {
+        if (typeof item !== 'string') continue;
+        const cleaned = item.trim().replace(/^["']|["']$/g, '').trim();
+        if (cleaned && !seen.has(cleaned)) {
+            seen.add(cleaned);
+            normalized.push(cleaned);
+        }
+    }
+    return normalized;
+}
+
 function getFullCommandString(interaction) {
     const parts = [`/${interaction.commandName}`];
 
@@ -69,27 +88,33 @@ export default {
 
         // Per-command & subcommand role permission requirement (defaults to None / everyone)
         if (interaction.guild) {
-            const commandRoles = SettingsManager.getGuildJson(interaction.guild.id, 'command_roles', {});
+            const rawCommandRoles = SettingsManager.getGuildJson(interaction.guild.id, 'command_roles', {});
+            const commandRoles = (rawCommandRoles && typeof rawCommandRoles === 'object' && !Array.isArray(rawCommandRoles))
+                ? rawCommandRoles
+                : {};
             const subcommand = typeof interaction.options?.getSubcommand === 'function' 
                 ? interaction.options.getSubcommand(false) 
                 : null;
             const subKey = subcommand ? `${interaction.commandName} ${subcommand}` : null;
 
             // Check subcommand override first, then fall back to parent command role
-            let requiredRoleId = subKey ? commandRoles[subKey] : null;
-            if (!requiredRoleId) {
-                requiredRoleId = commandRoles[interaction.commandName];
-            }
+            const subRoles = subKey ? normalizeCommandRoleIds(commandRoles[subKey]) : [];
+            const requiredRoleIds = subRoles.length > 0
+                ? subRoles
+                : normalizeCommandRoleIds(commandRoles[interaction.commandName]);
 
-            if (requiredRoleId) {
+            if (requiredRoleIds.length > 0) {
                 const isOwner = interaction.guild.ownerId === interaction.user.id;
                 const isAdmin = interaction.member?.permissions?.has(PermissionFlagsBits.Administrator);
-                const hasRole = interaction.member?.roles?.cache?.has(requiredRoleId);
+                const hasRole = requiredRoleIds.some(rId => interaction.member?.roles?.cache?.has(rId));
 
                 if (!isOwner && !isAdmin && !hasRole) {
                     const cmdDisplay = subKey ? `/${subKey}` : `/${interaction.commandName}`;
+                    const content = requiredRoleIds.length === 1
+                        ? `⚠️ You need the <@&${requiredRoleIds[0]}> role to use \`${cmdDisplay}\`.`
+                        : `⚠️ You need one of the following roles to use \`${cmdDisplay}\`: ${requiredRoleIds.map(id => `<@&${id}>`).join(', ')}.`;
                     return interaction.reply({
-                        content: `⚠️ You need the <@&${requiredRoleId}> role to use \`${cmdDisplay}\`.`,
+                        content,
                         ephemeral: true
                     });
                 }

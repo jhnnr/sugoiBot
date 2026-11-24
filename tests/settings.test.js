@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SettingsManager } from '../lib/settings.js';
+import { SettingsManager, DEFAULT_MODULE_EMBED_COLORS } from '../lib/settings.js';
 import db from '../lib/database.js';
 
 vi.mock('../lib/database.js', () => ({
@@ -224,5 +224,110 @@ describe('SettingsManager', () => {
         expect(mockRun).toHaveBeenCalledWith('guild_batch_1', 'xp_channel_id', JSON.stringify('987654321098765432'));
         expect(mockRun).toHaveBeenCalledWith('guild_batch_1', 'xp_min', JSON.stringify(30));
         expect(mockRun).toHaveBeenCalledWith('guild_batch_1', 'xp_max', JSON.stringify(60));
+    });
+
+    it('validate should accept valid module_embed_colors maps and reject invalid hex or non-plain objects', () => {
+        expect(DEFAULT_MODULE_EMBED_COLORS).toEqual(expect.objectContaining({
+            core: '#5865F2',
+            general: '#5865F2',
+            economy: '#F1C40F',
+            moderation: '#ED4245',
+            xp: '#9B59B6',
+            gamerole: '#FF0000',
+            voice: '#57F287'
+        }));
+
+        expect(SettingsManager.validate('module_embed_colors', {})).toBe(true);
+        expect(SettingsManager.validate('module_embed_colors', {
+            economy: '#12ab34',
+            xp: '#ABCDEF',
+            voice: ''
+        })).toBe(true);
+
+        expect(SettingsManager.validate('module_embed_colors', ['#5865F2'])).toBe(false);
+        expect(SettingsManager.validate('module_embed_colors', null)).toBe(false);
+        expect(SettingsManager.validate('module_embed_colors', '#5865F2')).toBe(false);
+        expect(SettingsManager.validate('module_embed_colors', { economy: '123456' })).toBe(false);
+        expect(SettingsManager.validate('module_embed_colors', { economy: '#123' })).toBe(false);
+        expect(SettingsManager.validate('module_embed_colors', { economy: '#GGGGGG' })).toBe(false);
+        expect(SettingsManager.validate('module_embed_colors', { economy: 0x5865F2 })).toBe(false);
+    });
+
+    it('getEmbedColor should return custom guild module color or fall back cleanly', () => {
+        db.prepare.mockReturnValue({
+            get: vi.fn().mockImplementation((guildId, key) => {
+                if (guildId === 'guild_themed' && key === 'module_embed_colors') {
+                    return { value: JSON.stringify({ economy: '#112233', xp: '' }) };
+                }
+                return undefined;
+            })
+        });
+
+        // Custom color lookup (including case-insensitive module name)
+        expect(SettingsManager.getEmbedColor('guild_themed', 'economy', 0xF1C40F)).toBe(0x112233);
+        expect(SettingsManager.getEmbedColor('guild_themed', 'ECONOMY', 0xF1C40F)).toBe(0x112233);
+
+        // Empty custom color falls back to numeric fallbackColor, hex string fallbackColor, or default 0x5865F2
+        expect(SettingsManager.getEmbedColor('guild_themed', 'xp', 0x9B59B6)).toBe(0x9B59B6);
+        expect(SettingsManager.getEmbedColor('guild_themed', 'moderation', '#ED4245')).toBe(0xED4245);
+        expect(SettingsManager.getEmbedColor('guild_default', 'general')).toBe(0x5865F2);
+    });
+
+    it('validate and normalizeCommandRoles should support single-role strings and multi-role string[] arrays', () => {
+        expect(SettingsManager.validate('command_roles', {
+            ban: '111222333',
+            kick: ['111222333', '444555666'],
+            'voice lock': []
+        })).toBe(true);
+
+        expect(SettingsManager.validate('command_roles', ['111222333'])).toBe(false);
+        expect(SettingsManager.validate('command_roles', null)).toBe(false);
+        expect(SettingsManager.validate('command_roles', { ban: 12345 })).toBe(false);
+        expect(SettingsManager.validate('command_roles', { ban: ['111222333', 999] })).toBe(false);
+        expect(SettingsManager.validate('command_roles', { ban: [null] })).toBe(false);
+        expect(SettingsManager.validate('role_rewards', ['111222333'])).toBe(false);
+
+        expect(SettingsManager.normalizeCommandRoles('12345')).toEqual(['12345']);
+        expect(SettingsManager.normalizeCommandRoles('"12345"')).toEqual(['12345']);
+        expect(SettingsManager.normalizeCommandRoles('   ')).toEqual([]);
+        expect(SettingsManager.normalizeCommandRoles(null)).toEqual([]);
+        expect(SettingsManager.normalizeCommandRoles(undefined)).toEqual([]);
+        expect(SettingsManager.normalizeCommandRoles(['"111"', " '222' ", '', '111', '333', '222'])).toEqual(['111', '222', '333']);
+    });
+
+    it('setGuildMany should sanitize quotes in command_roles strings/arrays and reject invalid array items', () => {
+        const mockRun = vi.fn();
+        db.prepare.mockReturnValue({ run: mockRun });
+        db.transaction = vi.fn((fn) => (items) => fn(items));
+
+        SettingsManager.setGuildMany('guild_roles_batch', {
+            command_roles: {
+                ban: '"111111111111111111"',
+                'voice lock': ['"222222222222222222"', "'333333333333333333'", '', '222222222222222222']
+            },
+            module_embed_colors: {
+                economy: '#F1C40F'
+            }
+        });
+
+        expect(mockRun).toHaveBeenCalledWith(
+            'guild_roles_batch',
+            'command_roles',
+            JSON.stringify({
+                ban: '111111111111111111',
+                'voice lock': ['222222222222222222', '333333333333333333']
+            })
+        );
+        expect(mockRun).toHaveBeenCalledWith(
+            'guild_roles_batch',
+            'module_embed_colors',
+            JSON.stringify({ economy: '#F1C40F' })
+        );
+
+        expect(() => {
+            SettingsManager.setGuildMany('guild_roles_batch', {
+                command_roles: { ban: ['111111111111111111', 999] }
+            });
+        }).toThrow(/Invalid value for setting command_roles/);
     });
 });

@@ -39,6 +39,13 @@ export default {
         // Save channel ID strictly for this guild
         SettingsManager.setGuildJson(guild.id, 'log_channel_id', channel.id);
 
+        let embedColor = 0x57F287;
+        try {
+            if (typeof SettingsManager.getEmbedColor === 'function') {
+                embedColor = SettingsManager.getEmbedColor(guild.id, 'moderation', 0x57F287);
+            }
+        } catch {}
+
         const testEmbed = new EmbedBuilder()
             .setAuthor({
                 name: interaction.user.tag,
@@ -46,7 +53,7 @@ export default {
             })
             .setTitle('✅ Log Channel Configured')
             .setDescription(`This channel has been set as the audit log channel for **${guild.name}** by ${interaction.user}.`)
-            .setColor(0x57F287)
+            .setColor(embedColor)
             .setTimestamp();
 
         await channel.send({ embeds: [testEmbed] }).catch(() => {});
