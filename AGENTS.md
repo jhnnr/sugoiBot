@@ -48,6 +48,7 @@ For agent behavioral rules, workflow discipline, and accumulated session memory,
   - `public/`: Frontend (`index.html`) featuring OAuth landing page, server selector, module toggles, modal settings, command role permission comboboxes, audit log checkboxes, settings export/import controls, live SSE Server Audit Logs viewer, and unsaved-changes bar.
 - `Dockerfile`, `docker-compose.yml`, `entrypoint.sh`: Multi-arch containerization (`linux/amd64`, `linux/arm64`) with `gosu` privilege de-escalation for non-root `/app/data` volume permissions.
 - `.github/`: `.github/workflows/docker-publish.yml` (CI/CD workflow across `master`/`main`/`dev` running Vitest and `scripts/release-version.js` for `package.json`-driven `vX.Y.Z-dev` / `vX.Y.Z-dev.N` Docker-only prereleases vs stable `vX.Y.Z` GitHub Release + `:latest` Docker publishes) and `.github/ISSUE_TEMPLATE/` (`bug_report.yml`, `feature_request.yml`).
+- `CHANGELOG.md`: Keep a Changelog release history with per-version sections (`## [vX.Y.Z]`) extracted into GitHub Releases on stable `vX.Y.Z` publishes via `scripts/release-version.js --extract-notes`.
 - `docs/` & `scripts/generate-docs.js`: MkDocs documentation and automated module reference generator (`docs/modules/*.md`).
 - `tests/`: 15 Vitest test suites (122 tests) covering modules, handlers, utilities, database settings, and dashboard endpoints.
 

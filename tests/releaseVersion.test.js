@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { evaluateReleaseVersion } from '../scripts/release-version.js';
+import { evaluateReleaseVersion, extractChangelogSection } from '../scripts/release-version.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -336,5 +336,407 @@ describe('evaluateReleaseVersion', () => {
                 }
             }
         });
+    });
+});
+
+describe('extractChangelogSection', () => {
+    describe('heading format variations', () => {
+        it.each([
+            ['## [v1.3.3] - 2026-11-24'],
+            ['## [1.3.3] - 2026-11-24'],
+            ['## v1.3.3'],
+            ['## 1.3.3']
+        ])('extracts matching section for %j whether version is "1.3.3" or "v1.3.3"', (heading) => {
+            const changelog = [
+                '# Changelog',
+                '',
+                '## [Unreleased]',
+                '### Added',
+                '- Upcoming change',
+                '',
+                heading,
+                '### Fixed',
+                '- Resolved audit mention formatting',
+                '',
+                '## [v1.3.2] - 2026-11-18',
+                '### Fixed',
+                '- Older fix'
+            ].join('\n');
+
+            expect(extractChangelogSection(changelog, '1.3.3')).toBe(
+                '### Fixed\n- Resolved audit mention formatting'
+            );
+            expect(extractChangelogSection(changelog, 'v1.3.3')).toBe(
+                '### Fixed\n- Resolved audit mention formatting'
+            );
+            expect(extractChangelogSection(changelog, '  v1.3.3  ')).toBe(
+                '### Fixed\n- Resolved audit mention formatting'
+            );
+        });
+    });
+
+    describe('Markdown preservation and boundary stripping', () => {
+        const expectedV133Body = [
+            '### Added',
+            '- Added `--extract-notes` support writing to `$RUNNER_TEMP/release-notes.md` and `$GITHUB_OUTPUT`.',
+            '- Preserves `$variables`, `${GITHUB_SHA}`, `$1`, `$&`, and `` `inline code` `` verbatim.',
+            '',
+            '```bash',
+            '## Comment inside fenced code block must not end the section',
+            'node scripts/release-version.js --extract-notes "$RUNNER_TEMP/release-notes.md"',
+            '```',
+            '',
+            '### Fixed',
+            '- Resolved `<@id>` and `**bold**` formatting in `loggingService`.'
+        ].join('\n');
+
+        const sampleChangelog = [
+            '# Changelog',
+            '',
+            '## [Unreleased]',
+            '',
+            '### Added',
+            '- Draft feature in Unreleased',
+            '',
+            '---',
+            '',
+            '## [v1.3.3] - 2026-11-24',
+            '',
+            expectedV133Body,
+            '',
+            '---',
+            '',
+            '## [v1.3.2] - 2026-11-18',
+            '',
+            '### Fixed',
+            '- Prevented false-positive `#floatingSaveBar` prompts.',
+            '',
+            '[Unreleased]: https://github.com/jhnnr/sugoiBot/compare/v1.3.3...HEAD',
+            '[v1.3.3]: https://github.com/jhnnr/sugoiBot/compare/v1.3.2...v1.3.3',
+            '[v1.3.2]: https://github.com/jhnnr/sugoiBot/compare/v1.3.1...v1.3.2'
+        ].join('\n');
+
+        it('preserves subheadings, bullets, code blocks, $variables, and backticks while excluding Unreleased, older versions, --- dividers, and link definitions', () => {
+            const extracted = extractChangelogSection(sampleChangelog, '1.3.3');
+
+            expect(extracted).toBe(expectedV133Body);
+            expect(extracted).not.toContain('Unreleased');
+            expect(extracted).not.toContain('v1.3.2');
+            expect(extracted).not.toContain('#floatingSaveBar');
+            expect(extracted).not.toMatch(/^---$/m);
+            expect(extracted).not.toContain('[v1.3.3]:');
+        });
+
+        it('strips trailing reference-link definitions at EOF when extracting the oldest version section', () => {
+            const extractedOldest = extractChangelogSection(sampleChangelog, 'v1.3.2');
+
+            expect(extractedOldest).toBe(
+                '### Fixed\n- Prevented false-positive `#floatingSaveBar` prompts.'
+            );
+            expect(extractedOldest).not.toContain('[Unreleased]:');
+            expect(extractedOldest).not.toContain('[v1.3.3]:');
+            expect(extractedOldest).not.toContain('[v1.3.2]:');
+        });
+    });
+
+    describe('line endings', () => {
+        it('handles both LF (\\n) and CRLF (\\r\\n) line endings identically', () => {
+            const lfChangelog = [
+                '# Changelog',
+                '',
+                '## [Unreleased]',
+                '- Unreleased item',
+                '',
+                '## [v1.3.3] - 2026-11-24',
+                '',
+                '### Added',
+                '- Multi-line item one',
+                '- Multi-line item two with `$ENV_VAR` and `code`',
+                '',
+                '---',
+                '',
+                '## [v1.3.2] - 2026-11-18',
+                '- Prior item',
+                '',
+                '[v1.3.3]: https://github.com/jhnnr/sugoiBot/compare/v1.3.2...v1.3.3'
+            ].join('\n');
+            const crlfChangelog = lfChangelog.replace(/\n/g, '\r\n');
+
+            const fromLf = extractChangelogSection(lfChangelog, '1.3.3');
+            const fromCrlf = extractChangelogSection(crlfChangelog, 'v1.3.3');
+
+            expect(fromCrlf).toBe(fromLf);
+            expect(fromCrlf).not.toContain('\r');
+            expect(fromCrlf).toBe(
+                '### Added\n- Multi-line item one\n- Multi-line item two with `$ENV_VAR` and `code`'
+            );
+        });
+    });
+
+    describe('missing, empty, and prefix-collision safety', () => {
+        it('returns empty string when version does not exist or inputs are empty', () => {
+            const changelog = '## [v1.3.3] - 2026-11-24\n### Fixed\n- Bug fix\n';
+
+            expect(extractChangelogSection(changelog, '9.9.9')).toBe('');
+            expect(extractChangelogSection(changelog, 'v9.9.9')).toBe('');
+            expect(extractChangelogSection(changelog, '')).toBe('');
+            expect(extractChangelogSection(changelog, 'v')).toBe('');
+            expect(extractChangelogSection(changelog, '   ')).toBe('');
+            expect(extractChangelogSection('', '1.3.3')).toBe('');
+            expect(extractChangelogSection(null, '1.3.3')).toBe('');
+            expect(extractChangelogSection(changelog, null)).toBe('');
+        });
+
+        it('returns empty string when matching section has an empty body', () => {
+            const emptyBetweenSections = [
+                '## [v1.3.4] - 2026-11-25',
+                '',
+                '---',
+                '',
+                '## [v1.3.3] - 2026-11-24',
+                '### Fixed',
+                '- Real content',
+                '',
+                '## [v1.3.2] - 2026-11-18',
+                '',
+                '[v1.3.2]: https://github.com/jhnnr/sugoiBot/releases/tag/v1.3.2'
+            ].join('\n');
+
+            expect(extractChangelogSection(emptyBetweenSections, '1.3.4')).toBe('');
+            expect(extractChangelogSection(emptyBetweenSections, 'v1.3.2')).toBe('');
+        });
+
+        it('does NOT falsely match 1.3.0 against 1.3.0-dev or 1.3.0-dev.N headings', () => {
+            const devHeadingsChangelog = [
+                '## [v1.3.0-dev.1] - 2026-11-24',
+                '- Numbered dev prerelease item',
+                '',
+                '## [1.3.0-dev] - 2026-11-23',
+                '- Bracketed dev item',
+                '',
+                '## v1.3.0-dev',
+                '- Unbracketed v-prefixed dev item',
+                '',
+                '## 1.3.0-dev',
+                '- Unbracketed plain dev item'
+            ].join('\n');
+
+            expect(extractChangelogSection(devHeadingsChangelog, '1.3.0')).toBe('');
+            expect(extractChangelogSection(devHeadingsChangelog, 'v1.3.0')).toBe('');
+        });
+
+        it('does NOT falsely match 1.3.1 against 1.3.10 or 1.3.10 against 1.3.1 (or unescaped dot wildcards)', () => {
+            const onlyV1310 = [
+                '## [v1.3.10] - 2026-11-24',
+                '- Ten patch release',
+                '',
+                '## [1.3.10] - 2026-11-24',
+                '- Ten bracketed plain',
+                '',
+                '## v1.3.10',
+                '- Ten unbracketed v',
+                '',
+                '## 1.3.10',
+                '- Ten unbracketed plain',
+                '',
+                '## [v1X3Y1] - 2026-11-24',
+                '- Wildcard dot trap'
+            ].join('\n');
+
+            expect(extractChangelogSection(onlyV1310, '1.3.1')).toBe('');
+            expect(extractChangelogSection(onlyV1310, 'v1.3.1')).toBe('');
+
+            const onlyV131 = [
+                '## [v1.3.1] - 2026-11-18',
+                '- One patch release',
+                '',
+                '## 1.3.1',
+                '- One unbracketed'
+            ].join('\n');
+
+            expect(extractChangelogSection(onlyV131, '1.3.10')).toBe('');
+            expect(extractChangelogSection(onlyV131, 'v1.3.10')).toBe('');
+        });
+    });
+});
+
+describe('CLI --extract-notes integration', () => {
+    const scriptPath = path.resolve(__dirname, '..', 'scripts', 'release-version.js');
+
+    it('writes extracted section to temp file and sets has_release_notes=true in GITHUB_OUTPUT when found', () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sugoibot-extract-found-'));
+        const changelogFile = path.join(tmpDir, 'CHANGELOG.md');
+        const notesFile = path.join(tmpDir, 'release-notes.md');
+        const ghOutputFile = path.join(tmpDir, 'github-output.txt');
+
+        try {
+            fs.writeFileSync(
+                changelogFile,
+                [
+                    '# Changelog',
+                    '',
+                    '## [Unreleased]',
+                    '- Next release work',
+                    '',
+                    '## [v1.3.3] - 2026-11-24',
+                    '',
+                    '### Fixed',
+                    '- Preserved `$RUNNER_TEMP` and `` `code` `` in notes.',
+                    '',
+                    '## [v1.3.2] - 2026-11-18',
+                    '- Older fix',
+                    '',
+                    '[v1.3.3]: https://github.com/jhnnr/sugoiBot/compare/v1.3.2...v1.3.3'
+                ].join('\n'),
+                'utf-8'
+            );
+
+            execFileSync(
+                process.execPath,
+                [
+                    scriptPath,
+                    '--extract-notes',
+                    notesFile,
+                    '--version',
+                    'v1.3.3',
+                    '--changelog',
+                    changelogFile
+                ],
+                {
+                    env: {
+                        ...process.env,
+                        GITHUB_OUTPUT: ghOutputFile
+                    },
+                    encoding: 'utf-8'
+                }
+            );
+
+            expect(fs.existsSync(notesFile)).toBe(true);
+            expect(fs.readFileSync(notesFile, 'utf-8')).toBe(
+                '### Fixed\n- Preserved `$RUNNER_TEMP` and `` `code` `` in notes.\n'
+            );
+
+            const ghOutput = fs.readFileSync(ghOutputFile, 'utf-8').trim().split(/\r?\n/);
+            expect(ghOutput).toEqual([
+                'has_release_notes=true',
+                `notes_file=${notesFile}`
+            ]);
+        } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    it('sets has_release_notes=false in GITHUB_OUTPUT and removes stale output file when version is missing or CHANGELOG is absent', () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sugoibot-extract-missing-'));
+        const changelogFile = path.join(tmpDir, 'CHANGELOG.md');
+        const notesFile = path.join(tmpDir, 'release-notes.md');
+        const ghOutputFile = path.join(tmpDir, 'github-output.txt');
+
+        try {
+            fs.writeFileSync(changelogFile, '# Changelog\n\n## [v1.3.2] - 2026-11-18\n- Existing note\n', 'utf-8');
+            fs.writeFileSync(notesFile, 'stale pre-existing content', 'utf-8');
+
+            execFileSync(
+                process.execPath,
+                [
+                    scriptPath,
+                    `--extract-notes=${notesFile}`,
+                    '--version=1.9.0',
+                    `--changelog=${changelogFile}`
+                ],
+                {
+                    env: {
+                        ...process.env,
+                        GITHUB_OUTPUT: ghOutputFile
+                    },
+                    encoding: 'utf-8'
+                }
+            );
+
+            expect(fs.existsSync(notesFile)).toBe(false);
+            expect(fs.readFileSync(ghOutputFile, 'utf-8').trim().split(/\r?\n/)).toEqual([
+                'has_release_notes=false',
+                `notes_file=${notesFile}`
+            ]);
+
+            const ghOutputMissingFile = path.join(tmpDir, 'github-output-absent.txt');
+            execFileSync(
+                process.execPath,
+                [
+                    scriptPath,
+                    '--extract-notes',
+                    notesFile,
+                    '--version',
+                    '1.3.3',
+                    '--changelog',
+                    path.join(tmpDir, 'DOES_NOT_EXIST.md')
+                ],
+                {
+                    env: {
+                        ...process.env,
+                        GITHUB_OUTPUT: ghOutputMissingFile
+                    },
+                    encoding: 'utf-8'
+                }
+            );
+
+            expect(fs.existsSync(notesFile)).toBe(false);
+            expect(fs.readFileSync(ghOutputMissingFile, 'utf-8').trim().split(/\r?\n/)).toEqual([
+                'has_release_notes=false',
+                `notes_file=${notesFile}`
+            ]);
+        } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+});
+
+describe('live repository CHANGELOG.md integration', () => {
+    it('extracts a non-empty changelog section from the real CHANGELOG.md for the current package.json version (1.3.3)', () => {
+        const rootDir = path.resolve(__dirname, '..');
+        const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
+        const changelogContent = fs.readFileSync(path.join(rootDir, 'CHANGELOG.md'), 'utf-8');
+
+        expect(pkg.version).toBe('1.3.3');
+        expect(changelogContent).not.toContain('## [Unreleased]');
+        expect(changelogContent).not.toContain('[Unreleased]:');
+        expect(changelogContent).toContain('https://github.com/jhnnr/sugoiBot/compare/');
+
+        const sectionPlain = extractChangelogSection(changelogContent, pkg.version);
+        const sectionPrefixed = extractChangelogSection(changelogContent, `v${pkg.version}`);
+        const oldestSection = extractChangelogSection(changelogContent, '1.0.0');
+
+        expect(sectionPlain.length).toBeGreaterThan(0);
+        expect(sectionPrefixed).toBe(sectionPlain);
+        expect(sectionPlain).toMatch(/^###\s+/m);
+        expect(sectionPlain).not.toContain('## [v1.3.2]');
+        expect(sectionPlain).not.toContain('[v1.3.3]:');
+
+        expect(oldestSection.length).toBeGreaterThan(0);
+        expect(oldestSection).not.toContain('[v1.0.0]:');
+        expect(oldestSection).not.toContain('[v1.3.3]:');
+
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sugoibot-live-changelog-'));
+        const notesFile = path.join(tmpDir, 'release-notes.md');
+        const ghOutputFile = path.join(tmpDir, 'github-output.txt');
+        const scriptPath = path.join(rootDir, 'scripts', 'release-version.js');
+
+        try {
+            execFileSync(process.execPath, [scriptPath, '--extract-notes', notesFile], {
+                env: {
+                    ...process.env,
+                    GITHUB_OUTPUT: ghOutputFile
+                },
+                encoding: 'utf-8'
+            });
+
+            expect(fs.readFileSync(notesFile, 'utf-8')).toBe(`${sectionPlain}\n`);
+            expect(fs.readFileSync(ghOutputFile, 'utf-8').trim().split(/\r?\n/)).toEqual([
+                'has_release_notes=true',
+                `notes_file=${notesFile}`
+            ]);
+        } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
     });
 });

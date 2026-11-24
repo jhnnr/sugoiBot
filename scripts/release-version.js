@@ -82,6 +82,176 @@ export function evaluateReleaseVersion({
     };
 }
 
+/**
+ * Extracts the Markdown body for a specific version's level-2 section from CHANGELOG.md content.
+ *
+ * @param {string} changelogContent
+ * @param {string} version
+ * @returns {string}
+ */
+export function extractChangelogSection(changelogContent, version) {
+    const cleanVersion = String(version || '').trim().replace(/^v/i, '');
+    if (!cleanVersion || typeof changelogContent !== 'string' || !changelogContent) {
+        return '';
+    }
+
+    const escapedVersion = cleanVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const headingRegex = new RegExp(
+        `^##[ \\t]+(?:\\[[vV]?${escapedVersion}\\]|[vV]?${escapedVersion}(?=$|[\\s:(])).*$`
+    );
+
+    const lines = changelogContent.replace(/\r\n?/g, '\n').split('\n');
+    const bodyLines = [];
+    let capturing = false;
+    let found = false;
+    let fenceChar = '';
+    let fenceLen = 0;
+
+    for (const line of lines) {
+        if (!fenceChar) {
+            const openFence = line.match(/^\s{0,3}(`{3,}(?=[^`]*$)|~{3,})/);
+            if (openFence) {
+                fenceChar = openFence[1][0];
+                fenceLen = openFence[1].length;
+                if (capturing) {
+                    bodyLines.push(line);
+                }
+                continue;
+            }
+        } else {
+            const closeFence = line.match(/^\s{0,3}(`{3,}|~{3,})\s*$/);
+            if (closeFence && closeFence[1][0] === fenceChar && closeFence[1].length >= fenceLen) {
+                fenceChar = '';
+                fenceLen = 0;
+            }
+            if (capturing) {
+                bodyLines.push(line);
+            }
+            continue;
+        }
+
+        if (!capturing) {
+            if (headingRegex.test(line)) {
+                capturing = true;
+                found = true;
+            }
+        } else if (/^##(?:[ \t]|$)/.test(line)) {
+            break;
+        } else {
+            bodyLines.push(line);
+        }
+    }
+
+    if (!found) {
+        return '';
+    }
+
+    while (bodyLines.length > 0) {
+        const last = bodyLines[bodyLines.length - 1].trim();
+        if (
+            last === '' ||
+            /^-{3,}$/.test(last) ||
+            /^\[[^\]]+\]:\s*\S+/.test(last)
+        ) {
+            bodyLines.pop();
+        } else {
+            break;
+        }
+    }
+
+    return bodyLines.join('\n').trim();
+}
+
+function parseCliArgs(argv) {
+    const options = {
+        extractNotesPath: null,
+        version: null,
+        changelogPath: null
+    };
+
+    for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i];
+        if (arg === '--extract-notes') {
+            const next = argv[i + 1];
+            if (next === undefined || next.startsWith('--')) {
+                throw new Error('Missing output path for --extract-notes.');
+            }
+            options.extractNotesPath = next;
+            i += 1;
+        } else if (arg.startsWith('--extract-notes=')) {
+            options.extractNotesPath = arg.slice('--extract-notes='.length);
+            if (!options.extractNotesPath) {
+                throw new Error('Missing output path for --extract-notes.');
+            }
+        } else if (arg === '--version') {
+            const next = argv[i + 1];
+            if (next === undefined || next.startsWith('--')) {
+                throw new Error('Missing value for --version.');
+            }
+            options.version = next;
+            i += 1;
+        } else if (arg.startsWith('--version=')) {
+            options.version = arg.slice('--version='.length);
+        } else if (arg === '--changelog') {
+            const next = argv[i + 1];
+            if (next === undefined || next.startsWith('--')) {
+                throw new Error('Missing path for --changelog.');
+            }
+            options.changelogPath = next;
+            i += 1;
+        } else if (arg.startsWith('--changelog=')) {
+            options.changelogPath = arg.slice('--changelog='.length);
+        }
+    }
+
+    return options;
+}
+
+function runExtractNotesCli(options, rootDir) {
+    const pkgPath = path.join(rootDir, 'package.json');
+    let targetVersion = typeof options.version === 'string' ? options.version.trim() : '';
+    if (!targetVersion) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+        targetVersion = typeof pkg.version === 'string' ? pkg.version.trim() : '';
+    }
+
+    const changelogPath = options.changelogPath
+        ? path.resolve(options.changelogPath)
+        : path.join(rootDir, 'CHANGELOG.md');
+    const outputPath = options.extractNotesPath;
+    const resolvedOutputPath = path.resolve(outputPath);
+
+    let notes = '';
+    if (fs.existsSync(changelogPath)) {
+        const changelogContent = fs.readFileSync(changelogPath, 'utf-8');
+        notes = extractChangelogSection(changelogContent, targetVersion);
+    }
+
+    const hasReleaseNotes = notes.length > 0;
+    if (hasReleaseNotes) {
+        fs.mkdirSync(path.dirname(resolvedOutputPath), { recursive: true });
+        fs.writeFileSync(resolvedOutputPath, `${notes}\n`, 'utf-8');
+        console.log(`Extracted changelog section for ${targetVersion} to ${outputPath}.`);
+    } else {
+        if (fs.existsSync(resolvedOutputPath)) {
+            fs.unlinkSync(resolvedOutputPath);
+        }
+        if (!fs.existsSync(changelogPath)) {
+            console.log(`CHANGELOG.md not found at ${changelogPath}; skipping release notes extraction for ${targetVersion}.`);
+        } else {
+            console.log(`No changelog section found for ${targetVersion} in ${changelogPath}.`);
+        }
+    }
+
+    if (process.env.GITHUB_OUTPUT) {
+        const lines = [
+            `has_release_notes=${hasReleaseNotes}`,
+            `notes_file=${outputPath}`
+        ];
+        fs.appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join('\n')}\n`, 'utf-8');
+    }
+}
+
 function readPackageVersionAtRef(ref, cwd) {
     try {
         execFileSync('git', ['cat-file', '-e', `${ref}:package.json`], {
@@ -129,11 +299,17 @@ function getExistingGitTags(cwd) {
     }
 }
 
-function runCli() {
+function runCli(argv = process.argv.slice(2)) {
     const rootDir = path.resolve(__dirname, '..');
     const pkgPath = path.join(rootDir, 'package.json');
 
     try {
+        const cliOptions = parseCliArgs(argv);
+        if (cliOptions.extractNotesPath !== null) {
+            runExtractNotesCli(cliOptions, rootDir);
+            return;
+        }
+
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
         const prevVersion = resolvePreviousVersion(rootDir);
         const existingTags = getExistingGitTags(rootDir);

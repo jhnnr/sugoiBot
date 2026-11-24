@@ -68,10 +68,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Creating Git Tag and GitHub Release for ${{ needs.test.outputs.github_release_tag }}..."
-          gh release create "${{ needs.test.outputs.github_release_tag }}" \
-            --title "${{ needs.test.outputs.github_release_tag }}" \
-            --generate-notes \
-            --target "${{ github.sha }}"
+          node scripts/release-version.js --extract-notes "$RUNNER_TEMP/release-notes.md" --version "${{ needs.test.outputs.version }}"
+          if [ -s "$RUNNER_TEMP/release-notes.md" ]; then
+            gh release create "${{ needs.test.outputs.github_release_tag }}" \
+              --title "${{ needs.test.outputs.github_release_tag }}" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --target "${{ github.sha }}"
+          else
+            echo "No matching CHANGELOG.md section found for ${{ needs.test.outputs.version }}; falling back to --generate-notes."
+            gh release create "${{ needs.test.outputs.github_release_tag }}" \
+              --title "${{ needs.test.outputs.github_release_tag }}" \
+              --generate-notes \
+              --target "${{ github.sha }}"
+          fi
 
       - name: Set up QEMU (for multi-architecture emulation)
         uses: docker/setup-qemu-action@v3
