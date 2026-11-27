@@ -1,8 +1,8 @@
 # Project TODOs
 
 ## 🔴 High Priority
-- [ ] **Automated SQLite Database Backups**: Scheduled periodic database snapshots and compressed backup exports for disaster recovery.
-- [ ] **API Rate Limiting Middleware**: Implement express rate-limiting middleware on auth and API endpoints to prevent request flooding.
+- [x] **Automated SQLite Database Backups**: Scheduled periodic database snapshots and compressed backup exports for disaster recovery.
+- [x] **API Rate Limiting Middleware**: Implement express rate-limiting middleware on auth and API endpoints to prevent request flooding.
 - [x] **Error Handling**: Implement a more robust global error handler to prevent bot crashes on unhandled rejections.
 - [x] **Cooldowns**: Add a cooldown system to commands to prevent spamming.
 - [x] **Validation**: Add validation for settings (e.g., ensure `xp_min` is a number and within bounds).

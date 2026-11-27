@@ -4,7 +4,9 @@ import {
     getVoiceRecord,
     getVoiceHubConfig,
     saveUserVoiceSettings,
-    resolveVoiceEmbedColor
+    resolveVoiceEmbedColor,
+    deleteVoiceRoomRecord,
+    emitVoiceUpdate
 } from '../lib/voiceHelper.js';
 
 export default {
@@ -106,6 +108,8 @@ export default {
                         categoryId = excluded.categoryId
                 `).run(guild.id, hubChannel.id, category.id);
 
+                emitVoiceUpdate(guild.id);
+
                 return interaction.editReply({
                     content: `✅ Temporary Voice system has been successfully configured!\n\n` +
                         `• **Category**: ${category.name}\n` +
@@ -142,7 +146,22 @@ export default {
             }
 
             const allHubs = db.prepare('SELECT * FROM voice_hubs WHERE guildId = ?').all(guild.id);
-            const activeRooms = db.prepare('SELECT * FROM voice_channels WHERE guildId = ?').all(guild.id);
+            let activeRooms = db.prepare('SELECT * FROM voice_channels WHERE guildId = ?').all(guild.id) || [];
+
+            if (guild.channels?.cache?.size > 0 && activeRooms.length > 0) {
+                let prunedAny = false;
+                activeRooms = activeRooms.filter(r => {
+                    if (guild.channels.cache.has(r.channelId)) {
+                        return true;
+                    }
+                    deleteVoiceRoomRecord(r.channelId);
+                    prunedAny = true;
+                    return false;
+                });
+                if (prunedAny) {
+                    emitVoiceUpdate(guild.id);
+                }
+            }
 
             if ((!allHubs || allHubs.length === 0) && (!activeRooms || activeRooms.length === 0)) {
                 return interaction.reply({
@@ -206,6 +225,7 @@ export default {
                 .run(interaction.user.id, voiceChannel.id);
             db.prepare('UPDATE voicemaster_channels SET ownerId = ? WHERE channelId = ?')
                 .run(interaction.user.id, voiceChannel.id);
+            emitVoiceUpdate(guild.id);
 
             return interaction.reply({
                 content: `👑 You are now the host of **${voiceChannel.name}**!`,
@@ -239,6 +259,7 @@ export default {
             const newName = interaction.options.getString('name').trim();
             await voiceChannel.setName(newName);
             saveUserVoiceSettings(interaction.user.id, { customName: newName });
+            emitVoiceUpdate(guild.id);
             return interaction.reply({
                 content: `✏️ Room renamed to **${newName}**! *(Saved as your default room name across servers)*`,
                 ephemeral: true
@@ -249,6 +270,7 @@ export default {
             const limit = interaction.options.getInteger('limit');
             await voiceChannel.setUserLimit(limit);
             saveUserVoiceSettings(interaction.user.id, { customLimit: limit });
+            emitVoiceUpdate(guild.id);
             return interaction.reply({
                 content: limit === 0 ? '👥 User limit removed (unlimited).' : `👥 User limit set to **${limit}** member(s). *(Saved across servers)*`,
                 ephemeral: true

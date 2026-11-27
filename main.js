@@ -10,6 +10,7 @@ import { GigaClient } from './lib/bot/GigaClient.js';
 import { loadModules } from './handlers/moduleHandler.js';
 import { deployCommands } from './deploy-commands.js';
 import { startDashboard } from './dashboard/server.js';
+import { startScheduledBackups } from './lib/backupService.js';
 
 const client = new GigaClient();
 
@@ -24,6 +25,7 @@ process.on('uncaughtException', (error) => {
 async function start() {
     client.logger.info('Starting Sugoi Bot...');
     startDashboard(client);
+    startScheduledBackups({ runOnStart: true });
     await loadModules(client);
     
     // Deploy commands without blocking bot startup

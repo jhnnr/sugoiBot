@@ -8,6 +8,18 @@ import cookieParser from 'cookie-parser';
 import db from '../lib/database.js';
 import { SettingsManager } from '../lib/settings.js';
 import { loggingService } from '../lib/bot/loggingService.js';
+import { authRateLimiter, apiRateLimiter, resetAllRateLimiters } from '../lib/middleware/rateLimiter.js';
+import {
+    createDatabaseBackup,
+    exportCompressedBackup,
+    listDatabaseBackups,
+    isValidBackupFilename,
+    resolveBackupFilePath,
+    deleteDatabaseBackup
+} from '../lib/backupService.js';
+import { emitVoiceUpdate, subscribeVoiceUpdates } from '../modules/voice/lib/voiceHelper.js';
+
+export { resetAllRateLimiters };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,6 +33,8 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(['/auth', '/api/auth'], authRateLimiter);
+app.use('/api', apiRateLimiter);
 
 // In-memory session store (sessionId -> { user, guilds, expiresAt })
 export const sessions = new Map();
@@ -677,6 +691,10 @@ app.post('/api/guilds/:guildId/settings/import', (req, res) => {
 
         importTx();
 
+        if (hasVoiceHubs) {
+            emitVoiceUpdate(guildId);
+        }
+
         loggingService.recordAuditLog(guildId, {
             title: 'Server Settings Imported',
             description: `Restored ${Object.keys(sanitizedSettings).length} server setting(s) via dashboard configuration import.`,
@@ -945,6 +963,193 @@ app.get('/api/guilds/:guildId/channels', async (req, res) => {
     }
 });
 
+export async function getGuildVoiceSnapshot(guildId) {
+    let hubs = db.prepare('SELECT * FROM voice_hubs WHERE guildId = ?').all(guildId);
+    if (!hubs || hubs.length === 0) {
+        hubs = db.prepare('SELECT * FROM voice_guilds WHERE guildId = ?').all(guildId);
+    }
+
+    const voiceRows = db.prepare('SELECT * FROM voice_channels WHERE guildId = ?').all(guildId);
+    const vmRows = db.prepare('SELECT * FROM voicemaster_channels WHERE guildId = ?').all(guildId);
+    const seenRoomIds = new Set();
+    let activeRooms = [];
+    for (const r of [...(voiceRows || []), ...(vmRows || [])]) {
+        if (!r?.channelId) continue;
+        const chId = String(r.channelId);
+        if (!seenRoomIds.has(chId)) {
+            seenRoomIds.add(chId);
+            activeRooms.push(r);
+        }
+    }
+
+    let discordChannels = [];
+    let resolvedFromClient = false;
+    let resolvedFromRest = false;
+    const liveClientChannelMap = new Map();
+
+    // 1. Live Discord client resolution first
+    if (discordClient) {
+        try {
+            const guild = discordClient.guilds?.cache?.get?.(guildId)
+                || (typeof discordClient.guilds?.fetch === 'function'
+                    ? await discordClient.guilds.fetch(guildId).catch(() => null)
+                    : null);
+            if (guild?.channels) {
+                const fetched = typeof guild.channels.fetch === 'function'
+                    ? await guild.channels.fetch().catch(() => guild.channels.cache)
+                    : guild.channels.cache;
+                const rawCollection = fetched || guild.channels.cache;
+                if (rawCollection) {
+                    const list = Array.isArray(rawCollection)
+                        ? rawCollection
+                        : (typeof rawCollection.values === 'function' ? Array.from(rawCollection.values()) : []);
+                    const validList = list.filter(Boolean);
+                    for (const c of validList) {
+                        if (c.id) {
+                            liveClientChannelMap.set(String(c.id), c);
+                        }
+                    }
+                    discordChannels = validList.map(c => ({
+                        id: String(c.id),
+                        name: c.name,
+                        type: c.type,
+                        position: typeof c.position === 'number' ? c.position : (typeof c.rawPosition === 'number' ? c.rawPosition : 0),
+                        parent_id: c.parentId ?? c.parent_id ?? null,
+                        user_limit: c.userLimit ?? c.user_limit ?? 0
+                    }));
+                    resolvedFromClient = true;
+                }
+            }
+        } catch {}
+    }
+
+    // 2. Fallback to Discord REST API with quote-sanitized DISCORD_TOKEN
+    if (!resolvedFromClient) {
+        const rawToken = process.env.DISCORD_TOKEN;
+        const botToken = rawToken ? rawToken.trim().replace(/^["']|["']$/g, '') : '';
+        if (botToken) {
+            try {
+                const cRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+                    headers: { Authorization: `Bot ${botToken}` }
+                });
+                if (cRes.ok) {
+                    const data = await cRes.json();
+                    if (Array.isArray(data)) {
+                        discordChannels = data.filter(Boolean).map(c => ({
+                            id: String(c.id),
+                            name: c.name,
+                            type: c.type,
+                            position: typeof c.position === 'number' ? c.position : 0,
+                            parent_id: c.parent_id ?? c.parentId ?? null,
+                            user_limit: c.user_limit ?? c.userLimit ?? 0
+                        }));
+                        resolvedFromRest = true;
+                    }
+                }
+            } catch {}
+        }
+    }
+
+    const channelMap = new Map(discordChannels.map(c => [String(c.id), c]));
+
+    if (resolvedFromClient || resolvedFromRest) {
+        const staleChannelIds = new Set();
+        const emptyChannelsToDelete = [];
+        const now = Date.now();
+
+        for (const r of [...(voiceRows || []), ...(vmRows || [])]) {
+            if (!r?.channelId) continue;
+            const chId = String(r.channelId);
+            if (!channelMap.has(chId)) {
+                staleChannelIds.add(chId);
+            } else if (resolvedFromClient) {
+                const liveCh = liveClientChannelMap.get(chId);
+                if (
+                    liveCh?.members instanceof Map &&
+                    liveCh.members.size === 0 &&
+                    r.createdAt &&
+                    now - Number(r.createdAt) > 15_000
+                ) {
+                    staleChannelIds.add(chId);
+                    emptyChannelsToDelete.push(liveCh);
+                }
+            }
+        }
+
+        if (staleChannelIds.size > 0) {
+            const pruneStaleVoiceTx = db.transaction((ids) => {
+                const delVoice = db.prepare('DELETE FROM voice_channels WHERE guildId = ? AND channelId = ?');
+                const delVm = db.prepare('DELETE FROM voicemaster_channels WHERE guildId = ? AND channelId = ?');
+                for (const id of ids) {
+                    delVoice.run(guildId, id);
+                    delVm.run(guildId, id);
+                }
+            });
+            pruneStaleVoiceTx([...staleChannelIds]);
+
+            for (const liveCh of emptyChannelsToDelete) {
+                channelMap.delete(String(liveCh.id));
+                if (typeof liveCh.delete === 'function') {
+                    await liveCh.delete('Pruning stale empty temporary voice room').catch(() => {});
+                }
+            }
+
+            activeRooms = activeRooms.filter(r => !staleChannelIds.has(String(r.channelId)));
+        }
+    }
+
+    const categories = discordChannels
+        .filter(c => c && c.type === 4)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map(c => ({
+            id: c.id,
+            name: c.name,
+            position: c.position ?? 0
+        }));
+
+    const enrichedHubs = (hubs || []).map(h => {
+        const ch = channelMap.get(String(h.hubChannelId));
+        let cat = h.categoryId ? channelMap.get(String(h.categoryId)) : null;
+        if (!cat && ch?.parent_id) {
+            cat = channelMap.get(String(ch.parent_id));
+        }
+
+        let catDisplayName = 'No Category';
+        if (cat?.name) {
+            catDisplayName = cat.name;
+        } else if (h.categoryId && discordChannels.length > 0 && !channelMap.has(String(h.categoryId))) {
+            catDisplayName = 'Deleted Category';
+        } else if (h.categoryId) {
+            catDisplayName = h.categoryId;
+        }
+
+        return {
+            hubChannelId: h.hubChannelId,
+            categoryId: h.categoryId || (ch?.parent_id || null),
+            name: ch ? ch.name : (h.hubChannelId ? `Hub (${h.hubChannelId})` : 'Join to Create'),
+            categoryName: catDisplayName,
+            existsInDiscord: Boolean(ch)
+        };
+    });
+
+    const enrichedRooms = (activeRooms || []).map(r => {
+        const ch = channelMap.get(String(r.channelId));
+        return {
+            channelId: r.channelId,
+            ownerId: r.ownerId,
+            name: ch ? ch.name : `Room (${r.channelId})`,
+            userLimit: ch ? ch.user_limit : 0,
+            createdAt: r.createdAt
+        };
+    });
+
+    return {
+        hubs: enrichedHubs,
+        activeRooms: enrichedRooms,
+        categories
+    };
+}
+
 app.get('/api/guilds/:guildId/voice', async (req, res) => {
     const session = getSession(req);
     if (!session) {
@@ -958,127 +1163,87 @@ app.get('/api/guilds/:guildId/voice', async (req, res) => {
     }
 
     try {
-        let hubs = db.prepare('SELECT * FROM voice_hubs WHERE guildId = ?').all(guildId);
-        if (!hubs || hubs.length === 0) {
-            hubs = db.prepare('SELECT * FROM voice_guilds WHERE guildId = ?').all(guildId);
-        }
-
-        const activeRooms = db.prepare('SELECT * FROM voice_channels WHERE guildId = ?').all(guildId);
-
-        let discordChannels = [];
-        let resolvedFromClient = false;
-
-        // 1. Live Discord client resolution first
-        if (discordClient) {
-            try {
-                const guild = discordClient.guilds?.cache?.get?.(guildId)
-                    || (typeof discordClient.guilds?.fetch === 'function'
-                        ? await discordClient.guilds.fetch(guildId).catch(() => null)
-                        : null);
-                if (guild?.channels) {
-                    const fetched = typeof guild.channels.fetch === 'function'
-                        ? await guild.channels.fetch().catch(() => guild.channels.cache)
-                        : guild.channels.cache;
-                    const rawCollection = fetched || guild.channels.cache;
-                    if (rawCollection) {
-                        const list = Array.isArray(rawCollection)
-                            ? rawCollection
-                            : (typeof rawCollection.values === 'function' ? Array.from(rawCollection.values()) : []);
-                        discordChannels = list.filter(Boolean).map(c => ({
-                            id: c.id,
-                            name: c.name,
-                            type: c.type,
-                            position: typeof c.position === 'number' ? c.position : (typeof c.rawPosition === 'number' ? c.rawPosition : 0),
-                            parent_id: c.parentId ?? c.parent_id ?? null,
-                            user_limit: c.userLimit ?? c.user_limit ?? 0
-                        }));
-                        resolvedFromClient = true;
-                    }
-                }
-            } catch {}
-        }
-
-        // 2. Fallback to Discord REST API with quote-sanitized DISCORD_TOKEN
-        if (!resolvedFromClient) {
-            const rawToken = process.env.DISCORD_TOKEN;
-            const botToken = rawToken ? rawToken.trim().replace(/^["']|["']$/g, '') : '';
-            if (botToken) {
-                try {
-                    const cRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
-                        headers: { Authorization: `Bot ${botToken}` }
-                    });
-                    if (cRes.ok) {
-                        const data = await cRes.json();
-                        if (Array.isArray(data)) {
-                            discordChannels = data.map(c => ({
-                                id: c.id,
-                                name: c.name,
-                                type: c.type,
-                                position: typeof c.position === 'number' ? c.position : 0,
-                                parent_id: c.parent_id ?? c.parentId ?? null,
-                                user_limit: c.user_limit ?? c.userLimit ?? 0
-                            }));
-                        }
-                    }
-                } catch {}
-            }
-        }
-
-        const channelMap = new Map(discordChannels.map(c => [c.id, c]));
-
-        const categories = discordChannels
-            .filter(c => c && c.type === 4)
-            .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-            .map(c => ({
-                id: c.id,
-                name: c.name,
-                position: c.position ?? 0
-            }));
-
-        const enrichedHubs = (hubs || []).map(h => {
-            const ch = channelMap.get(h.hubChannelId);
-            let cat = h.categoryId ? channelMap.get(h.categoryId) : null;
-            if (!cat && ch?.parent_id) {
-                cat = channelMap.get(ch.parent_id);
-            }
-
-            let catDisplayName = 'No Category';
-            if (cat?.name) {
-                catDisplayName = cat.name;
-            } else if (h.categoryId && discordChannels.length > 0 && !channelMap.has(h.categoryId)) {
-                catDisplayName = 'Deleted Category';
-            } else if (h.categoryId) {
-                catDisplayName = h.categoryId;
-            }
-
-            return {
-                hubChannelId: h.hubChannelId,
-                categoryId: h.categoryId || (ch?.parent_id || null),
-                name: ch ? ch.name : (h.hubChannelId ? `Hub (${h.hubChannelId})` : 'Join to Create'),
-                categoryName: catDisplayName,
-                existsInDiscord: Boolean(ch)
-            };
-        });
-
-        const enrichedRooms = (activeRooms || []).map(r => {
-            const ch = channelMap.get(r.channelId);
-            return {
-                channelId: r.channelId,
-                ownerId: r.ownerId,
-                name: ch ? ch.name : `Room (${r.channelId})`,
-                userLimit: ch ? ch.user_limit : 0,
-                createdAt: r.createdAt
-            };
-        });
-
-        res.json({
-            hubs: enrichedHubs,
-            activeRooms: enrichedRooms,
-            categories
-        });
+        const snapshot = await getGuildVoiceSnapshot(guildId);
+        res.json(snapshot);
     } catch (err) {
         res.status(500).json({ error: 'Failed to retrieve voice status' });
     }
+});
+
+app.get('/api/guilds/:guildId/voice/stream', async (req, res) => {
+    const session = getSession(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+    }
+
+    const { guildId } = req.params;
+    const targetGuild = getUserGuilds(session).find(g => g.id === guildId);
+    if (!targetGuild || !canManageGuild(targetGuild)) {
+        return res.status(403).json({ error: 'You do not have permission to manage this server.' });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    if (typeof res.flushHeaders === 'function') {
+        res.flushHeaders();
+    }
+
+    let closed = false;
+    let lastSerialized = null;
+    let pushInFlight = false;
+    let pushPending = false;
+
+    req.on('close', () => {
+        closed = true;
+    });
+
+    const pushSnapshot = async (force = false) => {
+        if (closed) return;
+        if (pushInFlight) {
+            pushPending = true;
+            return;
+        }
+        pushInFlight = true;
+        try {
+            do {
+                pushPending = false;
+                if (closed) break;
+                const snapshot = await getGuildVoiceSnapshot(guildId);
+                if (closed) break;
+                const payload = { guildId, ...snapshot };
+                const serialized = JSON.stringify(payload);
+                if (force || serialized !== lastSerialized) {
+                    lastSerialized = serialized;
+                    res.write(`data: ${serialized}\n\n`);
+                }
+                force = false;
+            } while (pushPending && !closed);
+        } catch {} finally {
+            pushInFlight = false;
+        }
+    };
+
+    res.write(`event: connected\ndata: ${JSON.stringify({ guildId })}\n\n`);
+    await pushSnapshot(true);
+
+    if (closed) return;
+
+    const unsubscribe = subscribeVoiceUpdates(guildId, () => {
+        void pushSnapshot(false);
+    });
+
+    const reconcileInterval = setInterval(() => {
+        void pushSnapshot(false);
+    }, 5_000);
+    if (typeof reconcileInterval.unref === 'function') {
+        reconcileInterval.unref();
+    }
+
+    req.on('close', () => {
+        clearInterval(reconcileInterval);
+        unsubscribe();
+    });
 });
 
 app.post('/api/guilds/:guildId/voice/hubs', async (req, res) => {
@@ -1257,6 +1422,7 @@ app.post('/api/guilds/:guildId/voice/hubs', async (req, res) => {
             );
         });
         persistHubTx();
+        emitVoiceUpdate(guildId);
 
         if (!resolvedCategoryName) {
             if (finalCategoryId) {
@@ -1334,6 +1500,8 @@ app.delete('/api/guilds/:guildId/voice/hubs/:hubChannelId', async (req, res) => 
                 }).catch(() => {});
             }
         }
+
+        emitVoiceUpdate(guildId);
 
         res.json({ success: true, deletedHubId: hubChannelId });
     } catch (error) {
@@ -1856,6 +2024,87 @@ app.get('/api/guilds/:guildId/roles', async (req, res) => {
     } catch (err) {
         return res.json({ roles: [] });
     }
+});
+
+/* =========================================================
+   Disaster Recovery SQLite Backup Routes
+   ========================================================= */
+
+function requireBackupAdmin(req, res) {
+    const session = getSession(req);
+    if (!session) {
+        res.status(401).json({ error: 'Unauthorized. Please login with Discord.' });
+        return null;
+    }
+    if (!getUserGuilds(session).some(canManageGuild)) {
+        res.status(403).json({ error: 'You do not have permission to manage database backups.' });
+        return null;
+    }
+    return session;
+}
+
+app.get('/api/backups', (req, res) => {
+    if (!requireBackupAdmin(req, res)) return;
+    try {
+        res.json({ backups: listDatabaseBackups() });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to list database backups' });
+    }
+});
+
+app.post('/api/backups', async (req, res) => {
+    if (!requireBackupAdmin(req, res)) return;
+    try {
+        const backup = await createDatabaseBackup();
+        res.status(201).json({ success: true, backup });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create database backup' });
+    }
+});
+
+app.get('/api/backups/export', async (req, res) => {
+    if (!requireBackupAdmin(req, res)) return;
+    try {
+        const exported = await exportCompressedBackup();
+        res.setHeader('Content-Type', 'application/gzip');
+        res.setHeader('Content-Disposition', `attachment; filename="${exported.filename}"`);
+        res.send(exported.buffer);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to export database backup' });
+    }
+});
+
+app.get('/api/backups/:filename/download', (req, res) => {
+    if (!requireBackupAdmin(req, res)) return;
+    const { filename } = req.params;
+    if (!isValidBackupFilename(filename)) {
+        return res.status(400).json({ error: 'Invalid backup filename.' });
+    }
+    const filePath = resolveBackupFilePath(filename);
+    if (!filePath) {
+        return res.status(404).json({ error: 'Backup file not found.' });
+    }
+    try {
+        const buffer = fs.readFileSync(filePath);
+        res.setHeader('Content-Type', 'application/gzip');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to download backup file' });
+    }
+});
+
+app.delete('/api/backups/:filename', (req, res) => {
+    if (!requireBackupAdmin(req, res)) return;
+    const { filename } = req.params;
+    if (!isValidBackupFilename(filename)) {
+        return res.status(400).json({ error: 'Invalid backup filename.' });
+    }
+    const deleted = deleteDatabaseBackup(filename);
+    if (!deleted) {
+        return res.status(404).json({ error: 'Backup file not found.' });
+    }
+    res.json({ success: true, deleted: filename });
 });
 
 /* =========================================================

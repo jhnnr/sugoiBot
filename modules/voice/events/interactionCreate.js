@@ -7,7 +7,7 @@ import {
     EmbedBuilder
 } from 'discord.js';
 import db from '../../../lib/database.js';
-import { getVoiceRecord, saveUserVoiceSettings, resolveVoiceEmbedColor } from '../lib/voiceHelper.js';
+import { getVoiceRecord, saveUserVoiceSettings, resolveVoiceEmbedColor, emitVoiceUpdate } from '../lib/voiceHelper.js';
 
 export default {
     name: Events.InteractionCreate,
@@ -29,6 +29,7 @@ export default {
                 const newName = interaction.fields.getTextInputValue('vm_input_name').trim();
                 await voiceChannel.setName(newName);
                 saveUserVoiceSettings(interaction.user.id, { customName: newName });
+                emitVoiceUpdate(interaction.guild.id);
                 return interaction.reply({
                     content: `✏️ Room renamed to **${newName}**! *(Saved as your default room name across servers)*`,
                     ephemeral: true
@@ -53,6 +54,7 @@ export default {
 
                 await voiceChannel.setUserLimit(limit);
                 saveUserVoiceSettings(interaction.user.id, { customLimit: limit });
+                emitVoiceUpdate(interaction.guild.id);
                 return interaction.reply({
                     content: limit === 0 ? '👥 User limit removed (unlimited).' : `👥 User limit set to **${limit}** member(s). *(Saved across servers)*`,
                     ephemeral: true
@@ -98,6 +100,7 @@ export default {
                 .run(interaction.user.id, voiceChannel.id);
             db.prepare('UPDATE voicemaster_channels SET ownerId = ? WHERE channelId = ?')
                 .run(interaction.user.id, voiceChannel.id);
+            emitVoiceUpdate(interaction.guild.id);
 
             return interaction.reply({
                 content: `👑 You have claimed ownership of **${voiceChannel.name}**!`,

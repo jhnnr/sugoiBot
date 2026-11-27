@@ -26,6 +26,7 @@ describe('evaluateReleaseVersion', () => {
                 isStable: false,
                 dockerTag: 'v1.2.0-dev',
                 includeLatest: false,
+                includeDev: true,
                 createGithubRelease: false,
                 githubReleaseTag: ''
             });
@@ -44,6 +45,7 @@ describe('evaluateReleaseVersion', () => {
                 isStable: false,
                 dockerTag: '1.2.0-dev',
                 includeLatest: false,
+                includeDev: true,
                 createGithubRelease: false,
                 githubReleaseTag: ''
             });
@@ -81,6 +83,7 @@ describe('evaluateReleaseVersion', () => {
                 isStable: false,
                 dockerTag: 'v1.2.0-dev.1',
                 includeLatest: false,
+                includeDev: true,
                 createGithubRelease: false,
                 githubReleaseTag: ''
             });
@@ -94,6 +97,7 @@ describe('evaluateReleaseVersion', () => {
                 releaseType: 'dev',
                 dockerTag: 'v1.2.0-dev.2',
                 includeLatest: false,
+                includeDev: true,
                 createGithubRelease: false,
                 githubReleaseTag: ''
             });
@@ -107,6 +111,7 @@ describe('evaluateReleaseVersion', () => {
                 releaseType: 'dev',
                 dockerTag: '1.2.0-dev.1',
                 includeLatest: false,
+                includeDev: true,
                 createGithubRelease: false,
                 githubReleaseTag: ''
             });
@@ -120,6 +125,7 @@ describe('evaluateReleaseVersion', () => {
                 releaseType: 'dev',
                 dockerTag: '1.2.0-dev.12',
                 includeLatest: false,
+                includeDev: true,
                 createGithubRelease: false,
                 githubReleaseTag: ''
             });
@@ -173,6 +179,7 @@ describe('evaluateReleaseVersion', () => {
                 isStable: true,
                 dockerTag: 'v1.2.0',
                 includeLatest: true,
+                includeDev: false,
                 createGithubRelease: true,
                 githubReleaseTag: 'v1.2.0'
             });
@@ -193,6 +200,7 @@ describe('evaluateReleaseVersion', () => {
                 isStable: true,
                 dockerTag: '1.2.0',
                 includeLatest: true,
+                includeDev: false,
                 createGithubRelease: true,
                 githubReleaseTag: 'v1.2.0'
             });
@@ -301,6 +309,95 @@ describe('evaluateReleaseVersion', () => {
         });
     });
 
+    describe('rolling dev Docker tag (includeDev & branchName)', () => {
+        it('enables includeDev for 1.4.0-dev and 1.4.0-dev.1 when branchName is "dev" or omitted, without touching latest or GitHub Release', () => {
+            for (const version of ['1.4.0-dev', '1.4.0-dev.1', 'v1.4.0-dev', 'v1.4.0-dev.1']) {
+                const onDevBranch = evaluateReleaseVersion({
+                    version,
+                    prevVersion: '1.3.3',
+                    branchName: 'dev'
+                });
+                expect(onDevBranch).toMatchObject({
+                    changed: true,
+                    version,
+                    releaseType: 'dev',
+                    isDev: true,
+                    isStable: false,
+                    dockerTag: version,
+                    includeDev: true,
+                    includeLatest: false,
+                    createGithubRelease: false,
+                    githubReleaseTag: ''
+                });
+
+                const defaultBranch = evaluateReleaseVersion({
+                    version,
+                    prevVersion: '1.3.3'
+                });
+                expect(defaultBranch).toMatchObject({
+                    includeDev: true,
+                    includeLatest: false,
+                    createGithubRelease: false
+                });
+
+                const whitespaceDevBranch = evaluateReleaseVersion({
+                    version,
+                    prevVersion: '1.3.3',
+                    branchName: '  dev  '
+                });
+                expect(whitespaceDevBranch.includeDev).toBe(true);
+            }
+        });
+
+        it('disables includeDev for 1.4.0-dev.1 when branchName is "master" or "main"', () => {
+            const onMaster = evaluateReleaseVersion({
+                version: '1.4.0-dev.1',
+                prevVersion: '1.4.0-dev',
+                branchName: 'master'
+            });
+            expect(onMaster).toMatchObject({
+                changed: true,
+                releaseType: 'dev',
+                isDev: true,
+                dockerTag: '1.4.0-dev.1',
+                includeDev: false,
+                includeLatest: false,
+                createGithubRelease: false,
+                githubReleaseTag: ''
+            });
+
+            const onMain = evaluateReleaseVersion({
+                version: '1.4.0-dev.1',
+                prevVersion: '1.4.0-dev',
+                branchName: 'main'
+            });
+            expect(onMain.includeDev).toBe(false);
+        });
+
+        it('sets includeDev: false, includeLatest: true, and createGithubRelease: true on stable 1.4.0 across branches', () => {
+            for (const branchName of ['', 'dev', 'master', 'main']) {
+                const stable = evaluateReleaseVersion({
+                    version: '1.4.0',
+                    prevVersion: '1.4.0-dev.1',
+                    existingTags: ['v1.3.3'],
+                    branchName
+                });
+                expect(stable).toMatchObject({
+                    changed: true,
+                    version: '1.4.0',
+                    releaseType: 'stable',
+                    isDev: false,
+                    isStable: true,
+                    dockerTag: '1.4.0',
+                    includeDev: false,
+                    includeLatest: true,
+                    createGithubRelease: true,
+                    githubReleaseTag: 'v1.4.0'
+                });
+            }
+        });
+    });
+
     describe('CLI entrypoint GITHUB_OUTPUT integration', () => {
         it('writes all expected key=value outputs when GITHUB_OUTPUT is set', () => {
             const tmpFile = path.join(os.tmpdir(), `sugoibot-gh-output-${process.pid}-${Date.now()}.txt`);
@@ -327,6 +424,7 @@ describe('evaluateReleaseVersion', () => {
                     'is_stable',
                     'docker_tag',
                     'include_latest',
+                    'include_dev',
                     'create_github_release',
                     'github_release_tag'
                 ]);
@@ -334,6 +432,102 @@ describe('evaluateReleaseVersion', () => {
                 if (fs.existsSync(tmpFile)) {
                     fs.unlinkSync(tmpFile);
                 }
+            }
+        });
+
+        it('writes include_dev=true when GITHUB_REF_NAME=dev on a -dev version and include_dev=false on master or stable', () => {
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sugoibot-cli-dev-tag-'));
+            const tmpScriptsDir = path.join(tmpDir, 'scripts');
+            const tmpScriptPath = path.join(tmpScriptsDir, 'release-version.js');
+            const realScriptPath = path.resolve(__dirname, '..', 'scripts', 'release-version.js');
+
+            try {
+                fs.mkdirSync(tmpScriptsDir, { recursive: true });
+                fs.copyFileSync(realScriptPath, tmpScriptPath);
+
+                const parseGhOutput = (filePath) => {
+                    const lines = fs.readFileSync(filePath, 'utf-8').trim().split(/\r?\n/);
+                    return Object.fromEntries(lines.map(line => {
+                        const idx = line.indexOf('=');
+                        return [line.slice(0, idx), line.slice(idx + 1)];
+                    }));
+                };
+
+                // 1. -dev version on dev branch -> include_dev=true
+                fs.writeFileSync(
+                    path.join(tmpDir, 'package.json'),
+                    JSON.stringify({ name: 'sugoibot', version: '1.4.0-dev.1', type: 'module' }),
+                    'utf-8'
+                );
+                const devBranchOut = path.join(tmpDir, 'out-dev-branch.txt');
+                execFileSync(process.execPath, [tmpScriptPath], {
+                    env: {
+                        ...process.env,
+                        GITHUB_OUTPUT: devBranchOut,
+                        GITHUB_EVENT_NAME: 'push',
+                        GITHUB_REF_NAME: 'dev'
+                    },
+                    encoding: 'utf-8'
+                });
+                expect(parseGhOutput(devBranchOut)).toMatchObject({
+                    version: '1.4.0-dev.1',
+                    release_type: 'dev',
+                    is_dev: 'true',
+                    is_stable: 'false',
+                    docker_tag: '1.4.0-dev.1',
+                    include_latest: 'false',
+                    include_dev: 'true',
+                    create_github_release: 'false',
+                    github_release_tag: ''
+                });
+
+                // 2. -dev version on master branch -> include_dev=false
+                const masterBranchOut = path.join(tmpDir, 'out-master-branch.txt');
+                execFileSync(process.execPath, [tmpScriptPath], {
+                    env: {
+                        ...process.env,
+                        GITHUB_OUTPUT: masterBranchOut,
+                        GITHUB_EVENT_NAME: 'push',
+                        GITHUB_REF_NAME: 'master'
+                    },
+                    encoding: 'utf-8'
+                });
+                expect(parseGhOutput(masterBranchOut)).toMatchObject({
+                    version: '1.4.0-dev.1',
+                    include_latest: 'false',
+                    include_dev: 'false',
+                    create_github_release: 'false'
+                });
+
+                // 3. Stable version -> include_dev=false, include_latest=true, create_github_release=true
+                fs.writeFileSync(
+                    path.join(tmpDir, 'package.json'),
+                    JSON.stringify({ name: 'sugoibot', version: '1.4.0', type: 'module' }),
+                    'utf-8'
+                );
+                const stableOut = path.join(tmpDir, 'out-stable.txt');
+                execFileSync(process.execPath, [tmpScriptPath], {
+                    env: {
+                        ...process.env,
+                        GITHUB_OUTPUT: stableOut,
+                        GITHUB_EVENT_NAME: 'push',
+                        GITHUB_REF_NAME: 'master'
+                    },
+                    encoding: 'utf-8'
+                });
+                expect(parseGhOutput(stableOut)).toMatchObject({
+                    version: '1.4.0',
+                    release_type: 'stable',
+                    is_dev: 'false',
+                    is_stable: 'true',
+                    docker_tag: '1.4.0',
+                    include_latest: 'true',
+                    include_dev: 'false',
+                    create_github_release: 'true',
+                    github_release_tag: 'v1.4.0'
+                });
+            } finally {
+                fs.rmSync(tmpDir, { recursive: true, force: true });
             }
         });
     });
@@ -750,5 +944,34 @@ describe('live repository CHANGELOG.md integration', () => {
         } finally {
             fs.rmSync(tmpDir, { recursive: true, force: true });
         }
+    });
+});
+
+describe('docker-publish.yml workflow wiring', () => {
+    it('wires GITHUB_REF_NAME, include_dev job output, and conditional rolling dev Docker tag without altering latest or GitHub Release gating', () => {
+        const workflowPath = path.resolve(__dirname, '..', '.github', 'workflows', 'docker-publish.yml');
+        const workflow = fs.readFileSync(workflowPath, 'utf-8');
+
+        // check_version passes GITHUB_REF_NAME
+        expect(workflow).toContain('GITHUB_REF_NAME: ${{ github.ref_name }}');
+
+        // test job exposes include_dev output alongside include_latest and create_github_release
+        expect(workflow).toContain('include_latest: ${{ steps.check_version.outputs.include_latest }}');
+        expect(workflow).toContain('include_dev: ${{ steps.check_version.outputs.include_dev }}');
+        expect(workflow).toContain('create_github_release: ${{ steps.check_version.outputs.create_github_release }}');
+
+        // docker/metadata-action@v5 configures latest, rolling dev, and version-specific docker_tag
+        expect(workflow).toContain(
+            "type=raw,value=latest,enable=${{ needs.test.outputs.include_latest == 'true' }}"
+        );
+        expect(workflow).toContain(
+            "type=raw,value=dev,enable=${{ needs.test.outputs.include_dev == 'true' }}"
+        );
+        expect(workflow).toContain(
+            'type=raw,value=${{ needs.test.outputs.docker_tag }}'
+        );
+
+        // GitHub Release step remains strictly gated on create_github_release == 'true'
+        expect(workflow).toContain("if: needs.test.outputs.create_github_release == 'true'");
     });
 });

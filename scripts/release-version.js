@@ -18,12 +18,14 @@ const ZERO_SHA = '0000000000000000000000000000000000000000';
  * @param {string} [options.prevVersion='']
  * @param {string[]|Set<string>} [options.existingTags=[]]
  * @param {string} [options.eventName='push']
+ * @param {string} [options.branchName='']
  */
 export function evaluateReleaseVersion({
     version,
     prevVersion = '',
     existingTags = [],
-    eventName = 'push'
+    eventName = 'push',
+    branchName = ''
 } = {}) {
     const trimmedVersion = typeof version === 'string' ? version.trim() : '';
     const isDev = DEV_VERSION_REGEX.test(trimmedVersion);
@@ -35,10 +37,12 @@ export function evaluateReleaseVersion({
         );
     }
 
+    const normalizedBranch = typeof branchName === 'string' ? branchName.trim() : '';
     const releaseType = isDev ? 'dev' : 'stable';
     const cleanVersion = trimmedVersion.replace(/^v/, '');
     const dockerTag = trimmedVersion;
     const includeLatest = isStable;
+    const includeDev = isDev && (!normalizedBranch || normalizedBranch === 'dev');
     const createGithubRelease = isStable;
     const githubReleaseTag = isStable ? `v${cleanVersion}` : '';
 
@@ -76,6 +80,7 @@ export function evaluateReleaseVersion({
         isStable,
         dockerTag,
         includeLatest,
+        includeDev,
         createGithubRelease,
         githubReleaseTag,
         reason
@@ -314,12 +319,14 @@ function runCli(argv = process.argv.slice(2)) {
         const prevVersion = resolvePreviousVersion(rootDir);
         const existingTags = getExistingGitTags(rootDir);
         const eventName = (process.env.GITHUB_EVENT_NAME || 'push').trim() || 'push';
+        const branchName = (process.env.GITHUB_REF_NAME || '').trim();
 
         const result = evaluateReleaseVersion({
             version: pkg.version,
             prevVersion,
             existingTags,
-            eventName
+            eventName,
+            branchName
         });
 
         console.log(result.reason);
@@ -333,6 +340,7 @@ function runCli(argv = process.argv.slice(2)) {
                 `is_stable=${result.isStable}`,
                 `docker_tag=${result.dockerTag}`,
                 `include_latest=${result.includeLatest}`,
+                `include_dev=${result.includeDev}`,
                 `create_github_release=${result.createGithubRelease}`,
                 `github_release_tag=${result.githubReleaseTag}`
             ];

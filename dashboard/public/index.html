@@ -2329,6 +2329,14 @@
                         <span class="badge badge-mono" id="selectedServerBadge">ID</span>
                     </div>
                     <div class="card-header-actions">
+                        <button type="button" class="btn-action" id="exportDbBackupBtn" title="Download compressed SQLite database backup (.sqlite.gz)">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                            </svg>
+                            <span>Backup DB</span>
+                        </button>
                         <button type="button" class="btn-action" id="exportSettingsBtn" title="Export server configuration as JSON">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -3307,6 +3315,8 @@
         let guildsListCache = [];
         let roleComboboxCleanups = [];
         let auditLogEventSource = null;
+        let voiceEventSource = null;
+        let lastVoiceCategoriesSignature = '';
         let auditLogsCache = [];
         let shopItemsCache = [];
         let warningsState = {
@@ -4775,8 +4785,10 @@
             }
         }
 
-        async function loadVoiceStatus(guildId) {
-            if (!guildId) return;
+        function applyVoiceStatusData(data) {
+            if (!data || typeof data !== 'object') return;
+            if (data.guildId && currentGuildId && String(data.guildId) !== String(currentGuildId)) return;
+
             const modalHubsList = document.getElementById('voiceHubsList');
             const modalHubsBadge = document.getElementById('voiceHubsCount');
             const studioHubsList = document.getElementById('voiceStudioHubsList');
@@ -4785,80 +4797,122 @@
             const activeRoomsBadge = document.getElementById('voiceActiveRoomsCount');
             const catSelect = document.getElementById('voiceHubCategorySelect');
 
+            const hubs = Array.isArray(data.hubs) ? data.hubs : [];
+            const activeRooms = Array.isArray(data.activeRooms) ? data.activeRooms : [];
+            const categories = Array.isArray(data.categories) ? data.categories : [];
+
+            const countLabel = `${hubs.length} ${hubs.length === 1 ? 'Hub' : 'Hubs'}`;
+            if (modalHubsBadge) modalHubsBadge.textContent = countLabel;
+            if (studioHubsBadge) studioHubsBadge.textContent = countLabel;
+            if (activeRoomsBadge) activeRoomsBadge.textContent = `${activeRooms.length} Active`;
+
+            const nextCategoriesSig = JSON.stringify(categories.map(c => ({ id: c.id, name: c.name })));
+            if (catSelect && (nextCategoriesSig !== lastVoiceCategoriesSignature || catSelect.children.length === 0)) {
+                lastVoiceCategoriesSignature = nextCategoriesSig;
+                const prevVal = catSelect.value;
+                catSelect.innerHTML = '<option value="__new__">+ Create New Category...</option>' +
+                    categories.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+                if (prevVal && (prevVal === '__new__' || categories.some(c => c.id === prevVal))) {
+                    catSelect.value = prevVal;
+                }
+                const newCatGroup = document.getElementById('voiceHubNewCategoryGroup');
+                if (newCatGroup) {
+                    newCatGroup.style.display = catSelect.value === '__new__' ? 'flex' : 'none';
+                }
+            }
+
+            const renderHubRows = (items) => {
+                if (items.length === 0) {
+                    return '<span class="help-text">No Join-to-Create hubs configured yet.</span>';
+                }
+                return items.map(h => `
+                    <div class="studio-item-row">
+                        <div class="list-row-main">
+                            <div class="list-row-title">${escapeHtml(h.name)}</div>
+                            <div class="list-row-meta">Category: ${escapeHtml(h.categoryName || 'Uncategorized')}</div>
+                        </div>
+                        <div class="list-row-actions">
+                            <span class="badge badge-mono">${escapeHtml(h.hubChannelId)}</span>
+                            <button type="button" class="btn-icon btn-icon-sm btn-icon-danger" data-delete-hub="${escapeHtml(h.hubChannelId)}" data-hub-name="${escapeHtml(h.name)}" title="Delete Hub">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            };
+
+            const hubsMarkup = renderHubRows(hubs);
+            if (modalHubsList) modalHubsList.innerHTML = hubsMarkup;
+            if (studioHubsList) studioHubsList.innerHTML = hubsMarkup;
+
+            document.querySelectorAll('[data-delete-hub]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    deleteVoiceHub(btn.getAttribute('data-delete-hub'), btn.getAttribute('data-hub-name'));
+                });
+            });
+
+            if (activeRoomsList) {
+                if (activeRooms.length === 0) {
+                    activeRoomsList.innerHTML = '<span class="help-text">No active temporary rooms right now.</span>';
+                } else {
+                    activeRoomsList.innerHTML = activeRooms.map(room => `
+                        <div class="studio-item-row">
+                            <div class="list-row-main">
+                                <div class="list-row-title">${escapeHtml(room.name || room.channelId)}</div>
+                                <div class="list-row-meta">Owner ID: ${escapeHtml(room.ownerId)}</div>
+                            </div>
+                            <span class="badge">${room.userLimit > 0 ? `Cap: ${room.userLimit}` : 'Unlimited'}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function disconnectVoiceStream() {
+            if (voiceEventSource) {
+                try {
+                    voiceEventSource.close();
+                } catch {}
+                voiceEventSource = null;
+            }
+        }
+
+        function connectVoiceStream(guildId) {
+            disconnectVoiceStream();
+            if (!guildId || typeof EventSource === 'undefined') return null;
+
+            const es = new EventSource('/api/guilds/' + guildId + '/voice/stream');
+            voiceEventSource = es;
+
+            es.onmessage = (event) => {
+                if (!event.data) return;
+                try {
+                    const payload = JSON.parse(event.data);
+                    if (payload && (!payload.guildId || String(payload.guildId) === String(currentGuildId))) {
+                        applyVoiceStatusData(payload);
+                    }
+                } catch {}
+            };
+
+            return es;
+        }
+
+        async function loadVoiceStatus(guildId) {
+            if (!guildId) return;
+            const modalHubsList = document.getElementById('voiceHubsList');
+            const studioHubsList = document.getElementById('voiceStudioHubsList');
+
             try {
                 const res = await fetch(`/api/guilds/${guildId}/voice`);
                 if (!res.ok) throw new Error();
                 const data = await res.json();
-                const hubs = data.hubs || [];
-                const activeRooms = data.activeRooms || [];
-                const categories = data.categories || [];
-
-                const countLabel = `${hubs.length} ${hubs.length === 1 ? 'Hub' : 'Hubs'}`;
-                if (modalHubsBadge) modalHubsBadge.textContent = countLabel;
-                if (studioHubsBadge) studioHubsBadge.textContent = countLabel;
-                if (activeRoomsBadge) activeRoomsBadge.textContent = `${activeRooms.length} Active`;
-
-                if (catSelect) {
-                    const prevVal = catSelect.value;
-                    catSelect.innerHTML = '<option value="__new__">+ Create New Category...</option>' +
-                        categories.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
-                    if (prevVal && (prevVal === '__new__' || categories.some(c => c.id === prevVal))) {
-                        catSelect.value = prevVal;
-                    }
-                    const newCatGroup = document.getElementById('voiceHubNewCategoryGroup');
-                    if (newCatGroup) {
-                        newCatGroup.style.display = catSelect.value === '__new__' ? 'flex' : 'none';
-                    }
-                }
-
-                const renderHubRows = (items) => {
-                    if (items.length === 0) {
-                        return '<span class="help-text">No Join-to-Create hubs configured yet.</span>';
-                    }
-                    return items.map(h => `
-                        <div class="studio-item-row">
-                            <div class="list-row-main">
-                                <div class="list-row-title">${escapeHtml(h.name)}</div>
-                                <div class="list-row-meta">Category: ${escapeHtml(h.categoryName || 'Uncategorized')}</div>
-                            </div>
-                            <div class="list-row-actions">
-                                <span class="badge badge-mono">${escapeHtml(h.hubChannelId)}</span>
-                                <button type="button" class="btn-icon btn-icon-sm btn-icon-danger" data-delete-hub="${escapeHtml(h.hubChannelId)}" data-hub-name="${escapeHtml(h.name)}" title="Delete Hub">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                </button>
-                            </div>
-                        </div>
-                    `).join('');
-                };
-
-                const hubsMarkup = renderHubRows(hubs);
-                if (modalHubsList) modalHubsList.innerHTML = hubsMarkup;
-                if (studioHubsList) studioHubsList.innerHTML = hubsMarkup;
-
-                document.querySelectorAll('[data-delete-hub]').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        deleteVoiceHub(btn.getAttribute('data-delete-hub'), btn.getAttribute('data-hub-name'));
-                    });
-                });
-
-                if (activeRoomsList) {
-                    if (activeRooms.length === 0) {
-                        activeRoomsList.innerHTML = '<span class="help-text">No active temporary rooms right now.</span>';
-                    } else {
-                        activeRoomsList.innerHTML = activeRooms.map(room => `
-                            <div class="studio-item-row">
-                                <div class="list-row-main">
-                                    <div class="list-row-title">${escapeHtml(room.name || room.channelId)}</div>
-                                    <div class="list-row-meta">Owner ID: ${escapeHtml(room.ownerId)}</div>
-                                </div>
-                                <span class="badge">${room.userLimit > 0 ? `Cap: ${room.userLimit}` : 'Unlimited'}</span>
-                            </div>
-                        `).join('');
-                    }
-                }
+                if (currentGuildId && String(guildId) !== String(currentGuildId)) return;
+                applyVoiceStatusData(data);
+                return data;
             } catch {
                 if (modalHubsList) modalHubsList.innerHTML = '<span class="empty-state-inline">Failed to load voice hubs.</span>';
                 if (studioHubsList) studioHubsList.innerHTML = '<span class="empty-state-inline">Failed to load voice hubs.</span>';
+                return null;
             }
         }
 
@@ -5537,7 +5591,44 @@
             };
         }
 
-        // Settings Export / Import
+        // Database Backup & Settings Export / Import
+        async function exportDatabaseBackup() {
+            const btn = document.getElementById('exportDbBackupBtn');
+            if (btn) btn.disabled = true;
+            try {
+                const res = await fetch('/api/backups/export');
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    showAlert(err.error || 'Failed to export database backup', false);
+                    return null;
+                }
+                const disposition = (res.headers && typeof res.headers.get === 'function')
+                    ? (res.headers.get('content-disposition') || '')
+                    : '';
+                const match = disposition.match(/filename="?([^";]+)"?/i);
+                const filename = match && match[1]
+                    ? match[1]
+                    : `sugoibot-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.sqlite.gz`;
+                const arrayBuffer = await res.arrayBuffer();
+                const blob = new Blob([arrayBuffer], { type: 'application/gzip' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showAlert('Database backup downloaded!', true);
+                return { filename, sizeBytes: arrayBuffer.byteLength };
+            } catch {
+                showAlert('Network error while exporting database backup', false);
+                return null;
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
         async function exportServerSettings() {
             if (!currentGuildId) return;
             try {
@@ -5600,6 +5691,10 @@
             }
         }
 
+        const exportDbBackupBtnEl = document.getElementById('exportDbBackupBtn');
+        if (exportDbBackupBtnEl) {
+            exportDbBackupBtnEl.addEventListener('click', exportDatabaseBackup);
+        }
         document.getElementById('exportSettingsBtn').addEventListener('click', exportServerSettings);
         document.getElementById('importSettingsBtn').addEventListener('click', () => {
             const fileInput = document.getElementById('importSettingsFileInput');
@@ -5683,6 +5778,7 @@
 
         function renderLoggedOut() {
             disconnectAuditLogStream();
+            disconnectVoiceStream();
             authSection.innerHTML = '';
             if (authenticatedShell) authenticatedShell.style.display = 'none';
             statsGrid.style.display = 'none';
@@ -5770,6 +5866,7 @@
             initialFormState = originalFormState;
             currentGuildId = guildId;
             currentGuildName = guildName || '';
+            lastVoiceCategoriesSignature = '';
 
             document.querySelectorAll('.server-item').forEach(el => {
                 el.classList.toggle('selected', el.getAttribute('data-guild-id') === guildId);
@@ -5789,6 +5886,7 @@
 
             loadAuditLogs(guildId);
             connectAuditLogStream(guildId);
+            connectVoiceStream(guildId);
 
             logChannelCombobox.setLoading();
             xpChannelCombobox.setLoading();
@@ -6030,6 +6128,10 @@
             renderAuditLogs,
             appendAuditLogEntry,
             loadAuditLogs,
+            exportDatabaseBackup,
+            applyVoiceStatusData,
+            connectVoiceStream,
+            disconnectVoiceStream,
             loadVoiceStatus,
             createVoiceHub,
             deleteVoiceHub,

@@ -8,7 +8,9 @@ import {
     getVoiceRecord,
     getUserVoiceSettings,
     createVoiceInterfaceEmbed,
-    createVoiceInterfaceComponents
+    createVoiceInterfaceComponents,
+    deleteVoiceRoomRecord,
+    emitVoiceUpdate
 } from '../lib/voiceHelper.js';
 
 export default {
@@ -101,17 +103,21 @@ export default {
                     const components = createVoiceInterfaceComponents();
                     await newChannel.send({ embeds: [embed], components }).catch(() => {});
                 }
+
+                emitVoiceUpdate(guild.id);
             }
 
             // --- 2. AUTO-DELETE (When temporary room becomes empty) ---
             if (oldState.channelId && !isHubChannel(oldState.channelId)) {
                 const record = getVoiceRecord(oldState.channelId);
                 if (record) {
-                    const channel = oldState.channel;
+                    const channel = oldState.channel ?? guild.channels?.cache?.get?.(oldState.channelId);
                     if (channel && channel.members.size === 0) {
-                        db.prepare('DELETE FROM voice_channels WHERE channelId = ?').run(oldState.channelId);
-                        db.prepare('DELETE FROM voicemaster_channels WHERE channelId = ?').run(oldState.channelId);
+                        deleteVoiceRoomRecord(oldState.channelId);
                         await channel.delete('Temporary voice room empty').catch(() => {});
+                        emitVoiceUpdate(guild.id);
+                    } else if (!channel && Boolean(guild.channels?.cache) && !guild.channels.cache.has(oldState.channelId)) {
+                        deleteVoiceRoomRecord(oldState.channelId, guild.id);
                     }
                 }
             }

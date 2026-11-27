@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
+import os from 'node:os';
+import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import vm from 'vm';
-import { app, setDiscordClient, setBotGuildsCache, clearBotGuildsCache } from '../dashboard/server.js';
+import { app, setDiscordClient, setBotGuildsCache, clearBotGuildsCache, resetAllRateLimiters } from '../dashboard/server.js';
 import { loggingService } from '../lib/bot/loggingService.js';
+import { emitVoiceUpdate } from '../modules/voice/lib/voiceHelper.js';
 import db from '../lib/database.js';
 
 const VOID_TAGS = new Set([
@@ -10,7 +14,7 @@ const VOID_TAGS = new Set([
     'LINK', 'META', 'PARAM', 'SOURCE', 'TRACK', 'WBR'
 ]);
 
-function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch }) {
+function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch, EventSource: CustomEventSource }) {
     const htmlPath = new URL('../dashboard/public/index.html', import.meta.url);
     const fullHtml = fs.readFileSync(htmlPath, 'utf8');
     const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*?)<script>/i);
@@ -437,6 +441,9 @@ function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch }) {
         clearTimeout,
         console
     };
+    if (CustomEventSource) {
+        windowObj.EventSource = CustomEventSource;
+    }
     windowObj.window = windowObj;
 
     vmContext = vm.createContext(windowObj);
@@ -445,6 +452,7 @@ function createDashboardDomHarness({ baseUrl, cookieHeader, customFetch }) {
 window.__dashboardTestApi = {
     ...(window.__dashboardTestApi || {}),
     checkAuth,
+    renderLoggedOut,
     loadGuilds,
     captureFormState,
     isFormDirty,
@@ -469,7 +477,11 @@ window.__dashboardTestApi = {
     formatAuditDescription,
     renderAuditLogs,
     appendAuditLogEntry,
-    loadAuditLogs
+    loadAuditLogs,
+    exportDatabaseBackup,
+    applyVoiceStatusData,
+    connectVoiceStream,
+    disconnectVoiceStream
 };
 `;
 
@@ -488,6 +500,8 @@ describe('Dashboard API', () => {
     let baseUrl;
 
     beforeEach(async () => {
+        resetAllRateLimiters();
+
         // Start an ephemeral listener for test requests
         await new Promise((resolve) => {
             server = app.listen(0, () => {
@@ -2715,6 +2729,603 @@ describe('Dashboard API', () => {
             expect(verifyJson.settings.module_embed_colors).toEqual({ xp: '#00DDAA' });
             expect(verifyJson.settings.command_roles.voice).toEqual(['333333333333333333', '444444444444444444']);
             expect(verifyJson.settings.command_roles['voice lock']).toEqual(['444444444444444444', '555555555555555555']);
+        });
+
+        it('Rate Limiting Middleware: enforces RateLimit-* headers, 429 + Retry-After on /auth, /api/auth, and /api, IP isolation, and resetAllRateLimiters()', async () => {
+            try {
+                // 1. /auth/discord enforces authRateLimiter (max 30 per IP)
+                let lastAuthRes = null;
+                for (let i = 1; i <= 30; i++) {
+                    lastAuthRes = await fetch(`${baseUrl}/auth/discord`, {
+                        headers: { 'X-Forwarded-For': '198.51.100.11' },
+                        redirect: 'manual'
+                    });
+                    expect(lastAuthRes.status).not.toBe(429);
+                }
+                expect(lastAuthRes.headers.get('ratelimit-limit')).toBe('30');
+                expect(lastAuthRes.headers.get('ratelimit-remaining')).toBe('0');
+                expect(Number(lastAuthRes.headers.get('ratelimit-reset'))).toBeGreaterThanOrEqual(1);
+
+                const blockedAuthRes = await fetch(`${baseUrl}/auth/discord`, {
+                    headers: { 'X-Forwarded-For': '198.51.100.11' },
+                    redirect: 'manual'
+                });
+                expect(blockedAuthRes.status).toBe(429);
+                expect(Number(blockedAuthRes.headers.get('retry-after'))).toBeGreaterThanOrEqual(1);
+                const blockedAuthBody = await blockedAuthRes.json();
+                expect(blockedAuthBody.error).toContain('Too many authentication attempts');
+                expect(blockedAuthBody.retryAfter).toBeGreaterThanOrEqual(1);
+
+                // 2. /api/auth/me also enforces authRateLimiter (max 30 per IP)
+                for (let i = 1; i <= 30; i++) {
+                    const okRes = await fetch(`${baseUrl}/api/auth/me`, {
+                        headers: { 'X-Forwarded-For': '198.51.100.12' }
+                    });
+                    expect(okRes.status).toBe(200);
+                }
+                const blockedApiAuthRes = await fetch(`${baseUrl}/api/auth/me`, {
+                    headers: { 'X-Forwarded-For': '198.51.100.12' }
+                });
+                expect(blockedApiAuthRes.status).toBe(429);
+                expect(Number(blockedApiAuthRes.headers.get('retry-after'))).toBeGreaterThanOrEqual(1);
+
+                // 3. /api/stats enforces apiRateLimiter (max 300 per IP) while keeping other IPs unaffected
+                const firstApiRes = await fetch(`${baseUrl}/api/stats`, {
+                    headers: { 'X-Forwarded-For': '198.51.100.13' }
+                });
+                expect(firstApiRes.status).toBe(200);
+                expect(firstApiRes.headers.get('ratelimit-limit')).toBe('300');
+                expect(firstApiRes.headers.get('ratelimit-remaining')).toBe('299');
+                expect(Number(firstApiRes.headers.get('ratelimit-reset'))).toBeGreaterThanOrEqual(1);
+
+                for (let batchStart = 2; batchStart <= 300; batchStart += 50) {
+                    const batchEnd = Math.min(300, batchStart + 49);
+                    const reqs = [];
+                    for (let i = batchStart; i <= batchEnd; i++) {
+                        reqs.push(fetch(`${baseUrl}/api/stats`, {
+                            headers: { 'X-Forwarded-For': '198.51.100.13' }
+                        }));
+                    }
+                    const responses = await Promise.all(reqs);
+                    for (const r of responses) {
+                        expect(r.status).toBe(200);
+                    }
+                }
+
+                const blockedApiRes = await fetch(`${baseUrl}/api/stats`, {
+                    headers: { 'X-Forwarded-For': '198.51.100.13' }
+                });
+                expect(blockedApiRes.status).toBe(429);
+                expect(Number(blockedApiRes.headers.get('retry-after'))).toBeGreaterThanOrEqual(1);
+                const blockedApiBody = await blockedApiRes.json();
+                expect(blockedApiBody.error).toContain('Too many API requests');
+
+                // Unrelated IP still succeeds
+                const otherIpRes = await fetch(`${baseUrl}/api/stats`, {
+                    headers: { 'X-Forwarded-For': '198.51.100.14' }
+                });
+                expect(otherIpRes.status).toBe(200);
+
+                // resetAllRateLimiters() clears counters immediately
+                resetAllRateLimiters();
+                const afterResetRes = await fetch(`${baseUrl}/auth/discord`, {
+                    headers: { 'X-Forwarded-For': '198.51.100.11' },
+                    redirect: 'manual'
+                });
+                expect(afterResetRes.status).not.toBe(429);
+            } finally {
+                resetAllRateLimiters();
+            }
+        });
+
+        it('Disaster Recovery SQLite Backups API & #exportDbBackupBtn UI: list, create, export/download gunzip verification, delete, auth guards, and 400 traversal protection', async () => {
+            const tempBackupDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sugoibot-dash-backups-'));
+            const prevBackupDir = process.env.BACKUP_DIR;
+            process.env.BACKUP_DIR = tempBackupDir;
+
+            try {
+                // 1. Unauthenticated requests return 401 across all backup endpoints
+                expect((await fetch(`${baseUrl}/api/backups`)).status).toBe(401);
+                expect((await fetch(`${baseUrl}/api/backups`, { method: 'POST' })).status).toBe(401);
+                expect((await fetch(`${baseUrl}/api/backups/export`)).status).toBe(401);
+                expect((await fetch(`${baseUrl}/api/backups/sugoibot-backup-2026.sqlite.gz/download`)).status).toBe(401);
+                expect((await fetch(`${baseUrl}/api/backups/sugoibot-backup-2026.sqlite.gz`, { method: 'DELETE' })).status).toBe(401);
+
+                // 2. Non-admin session (no manageable guilds) returns 403
+                const viewerCookie = await loginForGuilds([
+                    { id: 'viewer_only_guild', name: 'Read Only Server', permissions: '0', owner: false }
+                ], { id: 'viewer_u1', username: 'ViewerUser' });
+
+                expect((await fetch(`${baseUrl}/api/backups`, { headers: { Cookie: viewerCookie } })).status).toBe(403);
+                expect((await fetch(`${baseUrl}/api/backups`, { method: 'POST', headers: { Cookie: viewerCookie } })).status).toBe(403);
+                expect((await fetch(`${baseUrl}/api/backups/export`, { headers: { Cookie: viewerCookie } })).status).toBe(403);
+                expect((await fetch(`${baseUrl}/api/backups/sugoibot-backup-2026.sqlite.gz/download`, { headers: { Cookie: viewerCookie } })).status).toBe(403);
+                expect((await fetch(`${baseUrl}/api/backups/sugoibot-backup-2026.sqlite.gz`, { method: 'DELETE', headers: { Cookie: viewerCookie } })).status).toBe(403);
+
+                // 3. Admin session lifecycle: list -> create -> list -> export -> download -> traversal 400 -> delete -> 404
+                const bkpGuildId = 'backup_admin_guild_' + Date.now();
+                const adminCookie = await loginForGuilds([
+                    { id: bkpGuildId, name: 'Backup Admin Server', owner: true }
+                ], { id: 'bkp_admin_1', username: 'BackupAdmin' });
+
+                const initialListRes = await fetch(`${baseUrl}/api/backups`, {
+                    headers: { Cookie: adminCookie }
+                });
+                expect(initialListRes.status).toBe(200);
+                expect(await initialListRes.json()).toEqual({ backups: [] });
+
+                const createRes = await fetch(`${baseUrl}/api/backups`, {
+                    method: 'POST',
+                    headers: { Cookie: adminCookie }
+                });
+                expect(createRes.status).toBe(201);
+                const createdData = await createRes.json();
+                expect(createdData.success).toBe(true);
+                expect(createdData.backup.filename).toMatch(/^sugoibot-backup-[A-Za-z0-9._-]+\.sqlite\.gz$/);
+                expect(createdData.backup.sizeBytes).toBeGreaterThan(0);
+
+                const secondListRes = await fetch(`${baseUrl}/api/backups`, {
+                    headers: { Cookie: adminCookie }
+                });
+                expect(secondListRes.status).toBe(200);
+                const secondListData = await secondListRes.json();
+                expect(secondListData.backups).toHaveLength(1);
+                expect(secondListData.backups[0].filename).toBe(createdData.backup.filename);
+
+                // GET /api/backups/export returns valid gunzippable SQLite database
+                const exportRes = await fetch(`${baseUrl}/api/backups/export`, {
+                    headers: { Cookie: adminCookie }
+                });
+                expect(exportRes.status).toBe(200);
+                expect(exportRes.headers.get('content-type')).toContain('application/gzip');
+                expect(exportRes.headers.get('content-disposition')).toMatch(/attachment; filename="sugoibot-backup-.*\.sqlite\.gz"/);
+                const exportedRaw = gunzipSync(Buffer.from(await exportRes.arrayBuffer()));
+                expect(exportedRaw.subarray(0, 16).toString('utf8')).toBe('SQLite format 3\0');
+
+                // GET /api/backups/:filename/download returns valid gunzippable SQLite database
+                const downloadRes = await fetch(`${baseUrl}/api/backups/${encodeURIComponent(createdData.backup.filename)}/download`, {
+                    headers: { Cookie: adminCookie }
+                });
+                expect(downloadRes.status).toBe(200);
+                expect(downloadRes.headers.get('content-type')).toContain('application/gzip');
+                expect(downloadRes.headers.get('content-disposition')).toContain(createdData.backup.filename);
+                const downloadedRaw = gunzipSync(Buffer.from(await downloadRes.arrayBuffer()));
+                expect(downloadedRaw.subarray(0, 16).toString('utf8')).toBe('SQLite format 3\0');
+
+                // Path-traversal and malformed filenames return 400
+                for (const badName of [
+                    '..%2Fdatabase.sqlite',
+                    '..%5Cdatabase.sqlite',
+                    'sugoibot-backup-..sqlite.gz',
+                    'arbitrary.sqlite'
+                ]) {
+                    const badDlRes = await fetch(`${baseUrl}/api/backups/${badName}/download`, {
+                        headers: { Cookie: adminCookie }
+                    });
+                    expect(badDlRes.status).toBe(400);
+
+                    const badDelRes = await fetch(`${baseUrl}/api/backups/${badName}`, {
+                        method: 'DELETE',
+                        headers: { Cookie: adminCookie }
+                    });
+                    expect(badDelRes.status).toBe(400);
+                }
+
+                // Missing valid backup filename returns 404
+                const missingName = 'sugoibot-backup-1999-01-01T00-00-00-000Z.sqlite.gz';
+                expect((await fetch(`${baseUrl}/api/backups/${missingName}/download`, { headers: { Cookie: adminCookie } })).status).toBe(404);
+                expect((await fetch(`${baseUrl}/api/backups/${missingName}`, { method: 'DELETE', headers: { Cookie: adminCookie } })).status).toBe(404);
+
+                // DELETE /api/backups/:filename removes snapshot and subsequent DELETE returns 404
+                const delRes = await fetch(`${baseUrl}/api/backups/${encodeURIComponent(createdData.backup.filename)}`, {
+                    method: 'DELETE',
+                    headers: { Cookie: adminCookie }
+                });
+                expect(delRes.status).toBe(200);
+                expect(await delRes.json()).toEqual({
+                    success: true,
+                    deleted: createdData.backup.filename
+                });
+                expect((await fetch(`${baseUrl}/api/backups/${encodeURIComponent(createdData.backup.filename)}`, {
+                    method: 'DELETE',
+                    headers: { Cookie: adminCookie }
+                })).status).toBe(404);
+
+                // 4. Dashboard UI #exportDbBackupBtn downloads .sqlite.gz cleanly without marking #settingsForm dirty
+                setDiscordClient({
+                    guilds: {
+                        cache: new Map([
+                            [bkpGuildId, {
+                                id: bkpGuildId,
+                                name: 'Backup Admin Server',
+                                channels: { cache: new Map(), async fetch() { return this.cache; } },
+                                roles: { cache: new Map(), async fetch() { return this.cache; } }
+                            }]
+                        ])
+                    }
+                });
+
+                const { document, api } = createDashboardDomHarness({ baseUrl, cookieHeader: adminCookie });
+                await api.loadAllCommands();
+                await api.loadGuildSettings(bkpGuildId, 'Backup Admin Server');
+                await new Promise(r => setTimeout(r, 120));
+
+                const exportDbBtn = document.getElementById('exportDbBackupBtn');
+                expect(exportDbBtn).not.toBeNull();
+                expect(exportDbBtn.querySelector('svg')).not.toBeNull();
+                expect(exportDbBtn.querySelector('span')?.textContent).toBe('Backup DB');
+
+                const dlResult = await api.exportDatabaseBackup();
+                expect(dlResult).not.toBeNull();
+                expect(dlResult.filename).toMatch(/^sugoibot-backup-.*\.sqlite\.gz$/);
+                expect(dlResult.sizeBytes).toBeGreaterThan(0);
+                expect(api.isFormDirty()).toBe(false);
+                expect(document.getElementById('floatingSaveBar').classList.contains('visible')).toBe(false);
+            } finally {
+                if (prevBackupDir === undefined) delete process.env.BACKUP_DIR;
+                else process.env.BACKUP_DIR = prevBackupDir;
+                fs.rmSync(tempBackupDir, { recursive: true, force: true });
+            }
+        });
+
+        it('GitHub Issue #2: GET /voice prunes stale Room (<channelId>) rows via discordClient & REST fallback, /voice/stream pushes live SSE updates, and DOM connectVoiceStream updates #voiceStudioCard with zero live indicator', async () => {
+            const issue2GuildId = 'issue2_voice_guild_' + Date.now();
+            const cookieHeader = await loginForGuilds([
+                { id: issue2GuildId, name: 'Issue 2 Voice Server', owner: true }
+            ]);
+
+            let emptyChannelDeleted = false;
+            const channelCache = new Map([
+                ['cat_voice', { id: 'cat_voice', name: 'Temporary Voice', type: 4, position: 0 }],
+                ['hub_main', { id: 'hub_main', name: 'Join to Create', type: 2, position: 1, parentId: 'cat_voice' }],
+                [
+                    'active_room_777',
+                    {
+                        id: 'active_room_777',
+                        name: "sugoi.js's Room",
+                        type: 2,
+                        position: 2,
+                        parentId: 'cat_voice',
+                        userLimit: 4,
+                        members: new Map([['u_1', { id: 'u_1' }]])
+                    }
+                ],
+                [
+                    'empty_abandoned_room',
+                    {
+                        id: 'empty_abandoned_room',
+                        name: 'Ghost Empty Room',
+                        type: 2,
+                        position: 3,
+                        parentId: 'cat_voice',
+                        userLimit: 0,
+                        members: new Map(),
+                        async delete() {
+                            emptyChannelDeleted = true;
+                            channelCache.delete('empty_abandoned_room');
+                        }
+                    }
+                ]
+            ]);
+
+            setDiscordClient({
+                guilds: {
+                    cache: new Map([
+                        [
+                            issue2GuildId,
+                            {
+                                id: issue2GuildId,
+                                name: 'Issue 2 Voice Server',
+                                channels: {
+                                    cache: channelCache,
+                                    async fetch() {
+                                        return channelCache;
+                                    }
+                                },
+                                roles: {
+                                    cache: new Map(),
+                                    async fetch() {
+                                        return this.cache;
+                                    }
+                                }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            db.prepare('INSERT OR REPLACE INTO voice_hubs (hubChannelId, guildId, categoryId) VALUES (?, ?, ?)').run(
+                'hub_main',
+                issue2GuildId,
+                'cat_voice'
+            );
+
+            const staleChannelId = '1562165557103566918';
+            const oldCreatedAt = Date.now() - 60_000;
+            // Seed orphaned channel (deleted in Discord), abandoned empty room, and active room across voice_channels & voicemaster_channels
+            db.prepare('INSERT OR REPLACE INTO voice_channels (channelId, guildId, ownerId, createdAt) VALUES (?, ?, ?, ?)').run(
+                staleChannelId,
+                issue2GuildId,
+                'owner_stale',
+                oldCreatedAt
+            );
+            db.prepare('INSERT OR REPLACE INTO voicemaster_channels (channelId, guildId, ownerId, createdAt) VALUES (?, ?, ?, ?)').run(
+                staleChannelId,
+                issue2GuildId,
+                'owner_stale',
+                oldCreatedAt
+            );
+            db.prepare('INSERT OR REPLACE INTO voice_channels (channelId, guildId, ownerId, createdAt) VALUES (?, ?, ?, ?)').run(
+                'empty_abandoned_room',
+                issue2GuildId,
+                'owner_empty',
+                oldCreatedAt
+            );
+            db.prepare('INSERT OR REPLACE INTO voice_channels (channelId, guildId, ownerId, createdAt) VALUES (?, ?, ?, ?)').run(
+                'active_room_777',
+                issue2GuildId,
+                'owner_active',
+                oldCreatedAt
+            );
+
+            // 1. GET /voice prunes orphaned Room (1562165557103566918) + empty abandoned room via discordClient
+            const voiceRes = await fetch(`${baseUrl}/api/guilds/${issue2GuildId}/voice`, {
+                headers: { Cookie: cookieHeader }
+            });
+            expect(voiceRes.status).toBe(200);
+            const voiceData = await voiceRes.json();
+            expect(voiceData.activeRooms).toEqual([
+                expect.objectContaining({
+                    channelId: 'active_room_777',
+                    ownerId: 'owner_active',
+                    name: "sugoi.js's Room",
+                    userLimit: 4
+                })
+            ]);
+            expect(JSON.stringify(voiceData.activeRooms)).not.toContain(`Room (${staleChannelId})`);
+            expect(emptyChannelDeleted).toBe(true);
+            expect(db.prepare('SELECT * FROM voice_channels WHERE channelId = ?').get(staleChannelId)).toBeUndefined();
+            expect(db.prepare('SELECT * FROM voicemaster_channels WHERE channelId = ?').get(staleChannelId)).toBeUndefined();
+            expect(db.prepare('SELECT * FROM voice_channels WHERE channelId = ?').get('empty_abandoned_room')).toBeUndefined();
+
+            // 2. GET /voice REST fallback also prunes stale Room (1562165557103566918) when discordClient is detached
+            setDiscordClient(null);
+            db.prepare('INSERT OR REPLACE INTO voice_channels (channelId, guildId, ownerId, createdAt) VALUES (?, ?, ?, ?)').run(
+                staleChannelId,
+                issue2GuildId,
+                'owner_stale_rest',
+                oldCreatedAt
+            );
+            db.prepare('INSERT OR REPLACE INTO voicemaster_channels (channelId, guildId, ownerId, createdAt) VALUES (?, ?, ?, ?)').run(
+                staleChannelId,
+                issue2GuildId,
+                'owner_stale_rest',
+                oldCreatedAt
+            );
+
+            const prevToken = process.env.DISCORD_TOKEN;
+            process.env.DISCORD_TOKEN = '"mock_issue2_rest_token"';
+            const realFetch = global.fetch;
+            global.fetch = async (url, options) => {
+                if (String(url) === `https://discord.com/api/v10/guilds/${issue2GuildId}/channels`) {
+                    return new Response(
+                        JSON.stringify([
+                            { id: 'cat_voice', name: 'Temporary Voice', type: 4, position: 0 },
+                            { id: 'hub_main', name: 'Join to Create', type: 2, position: 1, parent_id: 'cat_voice' },
+                            { id: 'active_room_777', name: "sugoi.js's Room", type: 2, position: 2, parent_id: 'cat_voice', user_limit: 4 }
+                        ]),
+                        { status: 200, headers: { 'Content-Type': 'application/json' } }
+                    );
+                }
+                return realFetch(url, options);
+            };
+
+            try {
+                const restVoiceRes = await realFetch(`${baseUrl}/api/guilds/${issue2GuildId}/voice`, {
+                    headers: { Cookie: cookieHeader }
+                });
+                expect(restVoiceRes.status).toBe(200);
+                const restVoiceData = await restVoiceRes.json();
+                expect(restVoiceData.activeRooms).toHaveLength(1);
+                expect(restVoiceData.activeRooms[0].channelId).toBe('active_room_777');
+                expect(db.prepare('SELECT * FROM voice_channels WHERE channelId = ?').get(staleChannelId)).toBeUndefined();
+                expect(db.prepare('SELECT * FROM voicemaster_channels WHERE channelId = ?').get(staleChannelId)).toBeUndefined();
+            } finally {
+                global.fetch = realFetch;
+                if (prevToken === undefined) delete process.env.DISCORD_TOKEN;
+                else process.env.DISCORD_TOKEN = prevToken;
+            }
+
+            // Re-attach live discordClient for SSE stream & DOM tests
+            setDiscordClient({
+                guilds: {
+                    cache: new Map([
+                        [
+                            issue2GuildId,
+                            {
+                                id: issue2GuildId,
+                                name: 'Issue 2 Voice Server',
+                                channels: { cache: channelCache, async fetch() { return channelCache; } },
+                                roles: { cache: new Map(), async fetch() { return this.cache; } }
+                            }
+                        ]
+                    ])
+                }
+            });
+
+            // 3. GET /api/guilds/:guildId/voice/stream SSE auth guards + real-time push on emitVoiceUpdate
+            expect((await fetch(`${baseUrl}/api/guilds/${issue2GuildId}/voice/stream`)).status).toBe(401);
+            expect((await fetch(`${baseUrl}/api/guilds/forbidden_guild/voice/stream`, { headers: { Cookie: cookieHeader } })).status).toBe(403);
+
+            const abortController = new AbortController();
+            const streamRes = await fetch(`${baseUrl}/api/guilds/${issue2GuildId}/voice/stream`, {
+                headers: { Cookie: cookieHeader },
+                signal: abortController.signal
+            });
+            expect(streamRes.status).toBe(200);
+            expect(streamRes.headers.get('content-type')).toContain('text/event-stream');
+
+            const reader = streamRes.body.getReader();
+            const decoder = new TextDecoder();
+            let sseBuffer = '';
+
+            const readNextDataPayload = async () => {
+                while (true) {
+                    const blocks = sseBuffer.split('\n\n');
+                    sseBuffer = blocks.pop() || '';
+                    for (const block of blocks) {
+                        const lines = block.split('\n');
+                        const hasEventConnected = lines.some(l => l.startsWith('event: connected'));
+                        const dataLine = lines.find(l => l.startsWith('data: '));
+                        if (!hasEventConnected && dataLine) {
+                            return JSON.parse(dataLine.slice(6));
+                        }
+                    }
+                    const chunk = await reader.read();
+                    if (chunk.done) throw new Error('SSE stream ended unexpectedly');
+                    sseBuffer += decoder.decode(chunk.value, { stream: true });
+                }
+            };
+
+            try {
+                const initialSnapshot = await readNextDataPayload();
+                expect(initialSnapshot.guildId).toBe(issue2GuildId);
+                expect(initialSnapshot.activeRooms.map(r => r.channelId)).toEqual(['active_room_777']);
+
+                // Add a new temporary room and emit voice update -> pushed immediately over SSE
+                channelCache.set('live_room_888', {
+                    id: 'live_room_888',
+                    name: 'Squad Alpha',
+                    type: 2,
+                    position: 4,
+                    parentId: 'cat_voice',
+                    userLimit: 5,
+                    members: new Map([['u_2', { id: 'u_2' }]])
+                });
+                db.prepare('INSERT OR REPLACE INTO voice_channels (channelId, guildId, ownerId, createdAt) VALUES (?, ?, ?, ?)').run(
+                    'live_room_888',
+                    issue2GuildId,
+                    'owner_alpha',
+                    Date.now()
+                );
+                emitVoiceUpdate(issue2GuildId);
+
+                const secondSnapshot = await readNextDataPayload();
+                expect(secondSnapshot.activeRooms.map(r => r.name)).toEqual(["sugoi.js's Room", 'Squad Alpha']);
+
+                // Delete channel from Discord cache and emitVoiceUpdate -> SSE prunes stale DB row and pushes clean list
+                channelCache.delete('live_room_888');
+                emitVoiceUpdate(issue2GuildId);
+
+                const thirdSnapshot = await readNextDataPayload();
+                expect(thirdSnapshot.activeRooms.map(r => r.channelId)).toEqual(['active_room_777']);
+                expect(db.prepare('SELECT * FROM voice_channels WHERE channelId = ?').get('live_room_888')).toBeUndefined();
+            } finally {
+                abortController.abort();
+            }
+
+            // 4. DOM connectVoiceStream live updates + category dropdown preservation + zero #floatingSaveBar dirty state + ZERO "live" indicator
+            const eventSourceInstances = [];
+            class MockEventSource {
+                constructor(url) {
+                    this.url = url;
+                    this.closed = false;
+                    this.onmessage = null;
+                    this.onerror = null;
+                    this.listeners = new Map();
+                    eventSourceInstances.push(this);
+                }
+                addEventListener(type, fn) {
+                    if (!this.listeners.has(type)) this.listeners.set(type, []);
+                    this.listeners.get(type).push(fn);
+                }
+                close() {
+                    this.closed = true;
+                }
+            }
+
+            const { document, api } = createDashboardDomHarness({
+                baseUrl,
+                cookieHeader,
+                EventSource: MockEventSource
+            });
+            const saveBar = document.getElementById('floatingSaveBar');
+
+            await api.loadAllCommands();
+            await api.selectGuild(issue2GuildId, 'Issue 2 Voice Server');
+            await new Promise(r => setTimeout(r, 130));
+            await api.setWorkspaceView('module:voice');
+
+            const voiceStreamEs = eventSourceInstances.find(es => es.url === `/api/guilds/${issue2GuildId}/voice/stream`);
+            expect(voiceStreamEs).toBeDefined();
+            expect(voiceStreamEs.closed).toBe(false);
+
+            const catSelect = document.getElementById('voiceHubCategorySelect');
+            catSelect.value = 'cat_voice';
+            const preservedOptionNode = catSelect.children[1];
+            expect(preservedOptionNode).toBeDefined();
+
+            // Push live room update via SSE EventSource
+            voiceStreamEs.onmessage({
+                data: JSON.stringify({
+                    guildId: issue2GuildId,
+                    hubs: [{ hubChannelId: 'hub_main', name: 'Join to Create', categoryName: 'Temporary Voice' }],
+                    categories: [{ id: 'cat_voice', name: 'Temporary Voice', position: 0 }],
+                    activeRooms: [
+                        { channelId: 'active_room_777', ownerId: 'owner_active', name: "sugoi.js's Room", userLimit: 4 },
+                        { channelId: 'live_room_999', ownerId: 'owner_duo', name: 'Duo Queue', userLimit: 2 }
+                    ]
+                })
+            });
+
+            expect(document.getElementById('voiceActiveRoomsCount').textContent).toBe('2 Active');
+            const roomsHtml = document.getElementById('voiceActiveRoomsList').innerHTML;
+            expect(roomsHtml).toContain("sugoi.js&#39;s Room");
+            expect(roomsHtml).toContain('Duo Queue');
+            expect(roomsHtml).toContain('Cap: 2');
+            // Unchanged categories must NOT rebuild #voiceHubCategorySelect innerHTML
+            expect(catSelect.children[1]).toBe(preservedOptionNode);
+            expect(catSelect.value).toBe('cat_voice');
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // Push empty rooms update via SSE EventSource
+            voiceStreamEs.onmessage({
+                data: JSON.stringify({
+                    guildId: issue2GuildId,
+                    hubs: [{ hubChannelId: 'hub_main', name: 'Join to Create', categoryName: 'Temporary Voice' }],
+                    categories: [{ id: 'cat_voice', name: 'Temporary Voice', position: 0 }],
+                    activeRooms: []
+                })
+            });
+            expect(document.getElementById('voiceActiveRoomsCount').textContent).toBe('0 Active');
+            expect(document.getElementById('voiceActiveRoomsList').innerHTML).toContain('No active temporary rooms right now.');
+            expect(api.isFormDirty()).toBe(false);
+            expect(saveBar.classList.contains('visible')).toBe(false);
+
+            // STRICT REQUIREMENT: ZERO "Live" / "Live Stream" badge, status dot, or indicator in #voiceStudioCard
+            const voiceStudioCard = document.getElementById('voiceStudioCard');
+            expect(voiceStudioCard.querySelector('.audit-status-badge')).toBeNull();
+            expect(voiceStudioCard.querySelector('.status-dot')).toBeNull();
+            const allVoiceStudioText = [
+                voiceStudioCard.textContent,
+                voiceStudioCard.innerHTML,
+                ...voiceStudioCard.querySelectorAll('span, div, h3, button').map(el => `${el.textContent} ${el.innerHTML}`)
+            ].join(' ');
+            expect(allVoiceStudioText).toContain('Active Temporary Rooms');
+            expect(allVoiceStudioText).not.toMatch(/\bLive\b/i);
+            expect(allVoiceStudioText).not.toMatch(/Live Stream/i);
+
+            const rawHtml = fs.readFileSync(new URL('../dashboard/public/index.html', import.meta.url), 'utf8');
+            const voiceCardMarkupMatch = rawHtml.match(/<section[^>]*id="voiceStudioCard"[\s\S]*?<\/section>/i);
+            expect(voiceCardMarkupMatch).not.toBeNull();
+            expect(voiceCardMarkupMatch[0]).toContain('Active Temporary Rooms');
+            expect(voiceCardMarkupMatch[0]).not.toMatch(/\bLive\b/i);
+            expect(voiceCardMarkupMatch[0]).not.toMatch(/Live Stream/i);
+
+            // renderLoggedOut() cleanly disconnects voice EventSource
+            api.renderLoggedOut();
+            expect(voiceStreamEs.closed).toBe(true);
         });
     });
 });

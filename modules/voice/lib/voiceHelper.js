@@ -1,6 +1,108 @@
+import { EventEmitter } from 'node:events';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import db from '../../../lib/database.js';
 import { SettingsManager } from '../../../lib/settings.js';
+
+export const voiceUpdateEmitter = new EventEmitter();
+voiceUpdateEmitter.setMaxListeners(0);
+
+/**
+ * Emit an in-process voice room/hub update notification for a guild
+ */
+export function emitVoiceUpdate(guildId) {
+    if (!guildId) return null;
+    const key = String(guildId);
+    const payload = { guildId: key, timestamp: Date.now() };
+    voiceUpdateEmitter.emit(`voice:${key}`, payload);
+    return payload;
+}
+
+/**
+ * Subscribe to voice room/hub lifecycle updates for a guild
+ * @param {string} guildId
+ * @param {function} listener
+ * @returns {function} Unsubscribe callback
+ */
+export function subscribeVoiceUpdates(guildId, listener) {
+    if (!guildId || typeof listener !== 'function') {
+        return () => {};
+    }
+    const eventName = `voice:${String(guildId)}`;
+    const wrapped = (payload) => {
+        try {
+            listener(payload);
+        } catch {}
+    };
+    voiceUpdateEmitter.on(eventName, wrapped);
+    return () => {
+        voiceUpdateEmitter.off(eventName, wrapped);
+    };
+}
+
+/**
+ * Safely delete a temporary voice room record from both voice tables
+ */
+export function deleteVoiceRoomRecord(channelId, guildId = null) {
+    if (!channelId) return false;
+    db.prepare?.('DELETE FROM voice_channels WHERE channelId = ?')?.run?.(channelId);
+    db.prepare?.('DELETE FROM voicemaster_channels WHERE channelId = ?')?.run?.(channelId);
+    if (guildId) {
+        emitVoiceUpdate(guildId);
+    }
+    return true;
+}
+
+/**
+ * Reconcile persisted temporary voice rooms against live Discord guild channels
+ */
+export async function reconcileGuildVoiceRooms(guild) {
+    if (!guild?.id) return 0;
+
+    const voiceRows = db.prepare?.('SELECT * FROM voice_channels WHERE guildId = ?')?.all?.(guild.id) || [];
+    const vmRows = db.prepare?.('SELECT * FROM voicemaster_channels WHERE guildId = ?')?.all?.(guild.id) || [];
+
+    const channelIds = new Set();
+    for (const row of [...voiceRows, ...vmRows]) {
+        if (row?.channelId) {
+            channelIds.add(String(row.channelId));
+        }
+    }
+
+    if (channelIds.size === 0) return 0;
+
+    let channelMap = null;
+    if (typeof guild.channels?.fetch === 'function') {
+        const fetched = await guild.channels.fetch().catch(() => null);
+        if (fetched && typeof fetched.get === 'function') {
+            channelMap = fetched;
+        }
+    }
+    if (!channelMap && guild.channels?.cache && typeof guild.channels.cache.get === 'function') {
+        channelMap = guild.channels.cache;
+    }
+    if (!channelMap) return 0;
+
+    let cleanedCount = 0;
+    for (const channelId of channelIds) {
+        const ch = channelMap.get(channelId) ?? null;
+        if (!ch) {
+            deleteVoiceRoomRecord(channelId);
+            cleanedCount++;
+        } else if (ch.members && typeof ch.members.size === 'number' && ch.members.size === 0) {
+            deleteVoiceRoomRecord(channelId);
+            if (typeof ch.delete === 'function') {
+                await ch.delete('Temporary voice room empty on startup').catch(() => {});
+            }
+            cleanedCount++;
+        }
+    }
+
+    if (cleanedCount > 0) {
+        emitVoiceUpdate(guild.id);
+    }
+
+    return cleanedCount;
+}
 
 export function resolveVoiceEmbedColor(guildId, fallbackColor = 0x5865F2) {
     try {
@@ -57,9 +159,10 @@ export function createVoiceInterfaceComponents() {
  * Get channel record from voice_channels table
  */
 export function getVoiceRecord(channelId) {
-    let row = db.prepare('SELECT * FROM voice_channels WHERE channelId = ?').get(channelId);
+    if (!channelId) return null;
+    let row = db.prepare?.('SELECT * FROM voice_channels WHERE channelId = ?')?.get?.(channelId);
     if (!row) {
-        row = db.prepare('SELECT * FROM voicemaster_channels WHERE channelId = ?').get(channelId);
+        row = db.prepare?.('SELECT * FROM voicemaster_channels WHERE channelId = ?')?.get?.(channelId);
     }
     return row;
 }
@@ -94,11 +197,11 @@ export function getVoiceHubConfig(guildId) {
  */
 export function isHubChannel(channelId) {
     if (!channelId) return false;
-    let row = db.prepare('SELECT 1 FROM voice_hubs WHERE hubChannelId = ?').get(channelId);
+    let row = db.prepare?.('SELECT 1 FROM voice_hubs WHERE hubChannelId = ?')?.get?.(channelId);
     if (row) return true;
-    row = db.prepare('SELECT 1 FROM voice_guilds WHERE hubChannelId = ?').get(channelId);
+    row = db.prepare?.('SELECT 1 FROM voice_guilds WHERE hubChannelId = ?')?.get?.(channelId);
     if (row) return true;
-    row = db.prepare('SELECT 1 FROM voicemaster_guilds WHERE hubChannelId = ?').get(channelId);
+    row = db.prepare?.('SELECT 1 FROM voicemaster_guilds WHERE hubChannelId = ?')?.get?.(channelId);
     return Boolean(row);
 }
 
