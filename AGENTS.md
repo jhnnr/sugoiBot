@@ -48,7 +48,7 @@ For agent behavioral rules, workflow discipline, and accumulated session memory,
   - `public/`: Frontend (`index.html`) featuring OAuth landing page, server selector, module toggles, modal settings, command role permission comboboxes, audit log checkboxes, settings export/import controls, live SSE Server Audit Logs viewer, and unsaved-changes bar.
 - `Dockerfile`, `docker-compose.yml`, `entrypoint.sh`: Multi-arch containerization (`linux/amd64`, `linux/arm64`) with `gosu` privilege de-escalation for non-root `/app/data` volume permissions.
 - `.github/`: `.github/workflows/docker-publish.yml` (CI/CD workflow across `master`/`main`/`dev` running Vitest and `scripts/release-version.js` for `package.json`-driven `vX.Y.Z-dev` / `vX.Y.Z-dev.N` Docker-only prereleases vs stable `vX.Y.Z` GitHub Release + `:latest` Docker publishes) and `.github/ISSUE_TEMPLATE/` (`bug_report.yml`, `feature_request.yml`).
-- `CHANGELOG.md`: Keep a Changelog release history with per-version sections (`## [vX.Y.Z]`) extracted into GitHub Releases on stable `vX.Y.Z` publishes via `scripts/release-version.js --extract-notes`.
+- `CHANGELOG.md`: Keep a Changelog release history for stable releases only (`## [vX.Y.Z] - YYYY-MM-DD`, with no `-dev` or `[Unreleased]` sections), extracted into GitHub Releases on stable `vX.Y.Z` publishes via `scripts/release-version.js --extract-notes`.
 - `docs/` & `scripts/generate-docs.js`: MkDocs documentation and automated module reference generator (`docs/modules/*.md`).
 - `tests/`: 15 Vitest test suites (122 tests) covering modules, handlers, utilities, database settings, and dashboard endpoints.
 
@@ -66,6 +66,7 @@ For agent behavioral rules, workflow discipline, and accumulated session memory,
 - **Discord.js v14 Roles**: Pass `colors: { primaryColor: hex }` to `RoleManager.create()` instead of the deprecated `color` option.
 - **Temporary Voice Rooms**: In `modules/voice/`, send the room control panel directly into the temporary voice channel's integrated text chat upon creation rather than creating separate static text channels. Track hubs by `hubChannelId` (`voice_hubs`) and persist custom room names per user in `voice_user_settings`.
 - **Canvas Rendering**: Keep `@napi-rs/canvas` fonts compatible with Linux Docker containers (`fontconfig`, `fonts-dejavu-core`, `GlobalFonts.loadSystemFonts()`, and `"DejaVu Sans", sans-serif` font family stack).
+- **Stable Release Changelog Updates**: Whenever `version` in `package.json` is changed to a non-dev / stable release (`X.Y.Z` or `vX.Y.Z` without a `-dev` suffix), always update `CHANGELOG.md` with a matching `## [vX.Y.Z] - YYYY-MM-DD` section (and bottom `[vX.Y.Z]` comparison link) summarizing all notable changes since the previous stable release so `scripts/release-version.js --extract-notes` publishes it in the GitHub Release. Keep `CHANGELOG.md` strictly limited to stable versions only; do not update `CHANGELOG.md` for `-dev` prerelease bumps (such as `1.4.0-dev.2`) and never add `[Unreleased]` sections.
 
 ---
 
