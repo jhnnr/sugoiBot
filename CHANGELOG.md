@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Each stable release (`vX.Y.Z`) automatically extracts and publishes its matching version section from this file as the GitHub Release changelog.
 
+## [v1.4.0] - 2026-11-27
+
+### Added
+- Added Economy Server Shop and Inventory system with `/shop` (`list`, `buy`) and `/inventory` slash commands, `shop_items` and `user_inventory` SQLite tables, dashboard CRUD endpoints (`/api/guilds/:guildId/shop`), and JSON settings export/import support.
+- Added Dashboard Voice Hub Creator (`POST /api/guilds/:guildId/voice/hubs`) to create Join-to-Create voice hubs in existing or newly created Discord categories directly from the web dashboard.
+- Added Moderation Warnings Web Viewer (`GET /api/guilds/:guildId/warnings` and `DELETE /api/guilds/:guildId/warnings/:warningId`) with search, pagination, member/moderator username enrichment, and warning revocation.
+- Added per-guild Custom Module Embed Colors (`module_embed_colors` and `SettingsManager.getEmbedColor`) with dashboard hex accent color controls across bot modules.
+- Added multi-role Command Role Permissions (`string[]` support via `SettingsManager.normalizeCommandRoles`) across `/cmdperm` (`set`, `add`, `remove`, `clear`, `list`), `interactionCreate` enforcement, and dashboard multi-role chip comboboxes.
+- Added Automated SQLite Database Backups (`lib/backupService.js`) with hot `db.backup()` compressed `.sqlite.gz` snapshots, scheduled background backups with retention pruning, disaster-recovery endpoints (`/api/backups`, `/api/backups/export`, `/api/backups/:filename/download`, `/api/backups/:filename`), and dashboard `Backup DB` (`#exportDbBackupBtn`) export control.
+- Added API Rate Limiting Middleware (`lib/middleware/rateLimiter.js`) protecting `/auth`, `/api/auth`, and `/api` routes with `RateLimit-*` and `Retry-After` response headers.
+- Added live Server-Sent Events (SSE) voice status streaming (`GET /api/guilds/:guildId/voice/stream`) and `voiceHelper` pub/sub (`emitVoiceUpdate`, `subscribeVoiceUpdates`, `channelUpdate`) for real-time `Active Temporary Rooms` and hub updates in the dashboard.
+- Added `CHANGELOG.md` release history and `scripts/release-version.js` CI version evaluation and `--extract-notes` automation with `dev` branch workflow and rolling `:dev` Docker tag support.
+
+### Changed
+- Redesigned the web management dashboard with an enterprise SaaS workspace layout, summary metrics strip, and expandable `Modules` sidebar dropdown with dedicated inline per-module settings workspaces.
+- Consolidated Audit Log channel routing, core embed accent, and event subscription toggles into the dedicated `Audit Logs` dashboard workspace.
+
+### Fixed
+- Fixed stale temporary voice room tracking by automatically pruning orphaned, manually deleted, and empty abandoned rooms from `voice_channels` and `voicemaster_channels` (and deleted hubs from `voice_hubs`, `voice_guilds`, and `voicemaster_guilds`) across `channelDelete`, `ClientReady` startup reconciliation, `voiceStateUpdate`, `/voice info`, and `getGuildVoiceSnapshot()` ([#2](https://github.com/jhnnr/sugoiBot/issues/2)).
+
 ## [v1.3.3] - 2026-11-18
 
 ### Fixed
@@ -123,6 +143,7 @@ Each stable release (`vX.Y.Z`) automatically extracts and publishes its matching
 - Added Express v5 web management dashboard with Discord OAuth2 login, per-guild module toggles, and live configuration APIs.
 - Added multi-architecture (`linux/amd64`, `linux/arm64`) `Dockerfile`, `docker-compose.yml`, `gosu` `entrypoint.sh` volume permission handling, GitHub Actions Docker Hub publishing workflow, MkDocs documentation generator, and Vitest test suite.
 
+[v1.4.0]: https://github.com/jhnnr/sugoiBot/compare/v1.3.3...v1.4.0
 [v1.3.3]: https://github.com/jhnnr/sugoiBot/compare/v1.3.2...v1.3.3
 [v1.3.2]: https://github.com/jhnnr/sugoiBot/compare/v1.3.1...v1.3.2
 [v1.3.1]: https://github.com/jhnnr/sugoiBot/compare/v1.3.0...v1.3.1

@@ -1,6 +1,6 @@
 {
   "name": "sugoibot",
-  "version": "1.4.0-dev.2",
+  "version": "1.4.0",
   "type": "module",
   "main": "main.js",
   "scripts": {
